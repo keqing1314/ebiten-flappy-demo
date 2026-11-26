@@ -52,25 +52,6 @@ func (p *Pipe) Draw(dst, wall *ebiten.Image) {
 	drawSprite(dst, wall, p.X, p.GapY+PipeGapHeight)
 }
 
-// ScrollSpeedAt 返回存活 ticks 个 tick 后的卷动速度（像素/tick）。
-//
-// 速度随存活时间按对数增长：前期提升最明显，之后逐渐放缓，最终停在 ScrollSpeedMax：
-//
-//	speed = min(ScrollSpeedMax, ScrollSpeed + ScrollSpeedGain*ln(1+ticks/ScrollSpeedRampTicks))
-//
-// 之所以用对数而不是线性，是因为线性增长迟早会让管子快到无法反应，
-// 而对数曲线天然有上限，既能让玩家感到难度在涨，又不会失控。
-func ScrollSpeedAt(ticks int) float64 {
-	if ticks <= 0 {
-		return ScrollSpeed
-	}
-	speed := ScrollSpeed + ScrollSpeedGain*math.Log1p(float64(ticks)/ScrollSpeedRampTicks)
-	if speed > ScrollSpeedMax {
-		return ScrollSpeedMax
-	}
-	return speed
-}
-
 // itemPicker 决定一根新管子是否携带道具，speed 是生成时的卷动速度。
 // 返回 false 表示这根管子没有道具。
 //
@@ -81,9 +62,10 @@ type itemPicker func(speed float64) (ItemKind, bool)
 // PipeField 负责管理屏幕上所有管子：生成、移动、计分、回收。
 type PipeField struct {
 	pipes      []*Pipe
-	timer      int     // 距离下一次生成还有多少 tick
-	ticks      int     // 已经存活了多少个 tick，用来计算随存活时间提升的卷动速度
-	slowOffset float64 // 减速道具累计带来的减速量
+	timer      int        // 距离下一次生成还有多少 tick
+	ticks      int        // 已经存活了多少个 tick，用来计算随存活时间提升的卷动速度
+	difficulty Difficulty // 决定卷动速度曲线
+	slowOffset float64    // 减速道具累计带来的减速量
 	rng        *rand.Rand
 	score      int
 	lastCenter float64 // 上一根管子空隙中心的高度，用来限制变化幅度
@@ -96,11 +78,13 @@ type PipeField struct {
 //
 // seed 用于初始化随机数发生器：固定 seed 就能复现同一串管子，
 // 这让单元测试和「回放 bug」都变得可行。实际游戏里传入当前时间即可。
-func NewPipeField(seed uint64) *PipeField {
+// difficulty 决定卷动速度随存活时间变化的曲线。
+func NewPipeField(seed uint64, difficulty Difficulty) *PipeField {
 	f := &PipeField{
 		timer:      PipeInterval,
 		rng:        rand.New(rand.NewPCG(seed, seed>>1)),
 		lastCenter: (minGapCenter + maxGapCenter) / 2,
+		difficulty: difficulty,
 	}
 	f.spawn()
 	return f
@@ -117,9 +101,9 @@ func (f *PipeField) Pipes() []*Pipe {
 }
 
 // Speed 返回当前的卷动速度（像素/tick）：
-// 对数难度曲线减去道具带来的减速，且不会低于 ScrollSpeedFloor。
+// 难度曲线减去道具带来的减速，且不会低于 ScrollSpeedFloor。
 func (f *PipeField) Speed() float64 {
-	speed := ScrollSpeedAt(f.ticks) - f.slowOffset
+	speed := f.difficulty.SpeedAt(f.ticks) - f.slowOffset
 	if speed < ScrollSpeedFloor {
 		return ScrollSpeedFloor
 	}

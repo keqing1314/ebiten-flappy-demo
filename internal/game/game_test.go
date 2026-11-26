@@ -61,7 +61,7 @@ func TestPlayerJumpThenFall(t *testing.T) {
 }
 
 func TestPipeFieldSpawn(t *testing.T) {
-	f := NewPipeField(42)
+	f := NewPipeField(42, DifficultyNormal)
 	if len(f.Pipes()) != 1 {
 		t.Fatalf("开局应当生成 1 根管子, 实际 %d", len(f.Pipes()))
 	}
@@ -79,7 +79,7 @@ func TestPipeFieldSpawn(t *testing.T) {
 }
 
 func TestPipeFieldSpawnInterval(t *testing.T) {
-	f := NewPipeField(1)
+	f := NewPipeField(1, DifficultyNormal)
 
 	// 关掉计分干扰：这里只关心生成节奏。
 	for i := 0; i < PipeInterval-1; i++ {
@@ -96,7 +96,7 @@ func TestPipeFieldSpawnInterval(t *testing.T) {
 }
 
 func TestPipeFieldScoresOncePerPipe(t *testing.T) {
-	f := NewPipeField(7)
+	f := NewPipeField(7, DifficultyNormal)
 	f.timer = math.MaxInt // 关掉自动生成, 只留下开局那根管子
 
 	for i := 0; i < 1000; i++ {
@@ -112,7 +112,7 @@ func TestPipeFieldScoresOncePerPipe(t *testing.T) {
 }
 
 func TestPipeFieldGapChangeIsLimited(t *testing.T) {
-	f := NewPipeField(9)
+	f := NewPipeField(9, DifficultyNormal)
 	center := func(p *Pipe) float64 { return p.GapY + PipeGapHeight/2 }
 	prev := center(f.Pipes()[0])
 
@@ -193,7 +193,7 @@ func TestHealthDiesWhenHeartsRunOut(t *testing.T) {
 func newTestPlayScene(hearts int) *playScene {
 	s := &playScene{
 		player: NewPlayer(60, 75),
-		pipes:  NewPipeField(1),
+		pipes:  NewPipeField(1, DifficultyNormal),
 		health: NewHealth(hearts),
 	}
 	s.pipes.pipes = nil
@@ -385,7 +385,7 @@ func TestPlayerShrinkRefreshes(t *testing.T) {
 }
 
 func TestPipeFieldCarriesAndCollectsItems(t *testing.T) {
-	f := NewPipeField(21)
+	f := NewPipeField(21, DifficultyNormal)
 	f.spawnItem = func(speed float64) (ItemKind, bool) { return ItemHelmet, true }
 	f.pipes = nil
 	f.spawn()
@@ -483,7 +483,7 @@ func TestPlaySceneAppliesPickedItems(t *testing.T) {
 }
 
 func TestPipeFieldSlowDown(t *testing.T) {
-	f := NewPipeField(2)
+	f := NewPipeField(2, DifficultyNormal)
 	f.ticks = 3600 // 存活一分钟，速度已经明显高于开局
 	base := f.Speed()
 
@@ -503,7 +503,7 @@ func TestPipeFieldSlowDown(t *testing.T) {
 func newTestItemScene(seed uint64) *playScene {
 	return &playScene{
 		player: NewPlayer(60, 75),
-		pipes:  NewPipeField(seed),
+		pipes:  NewPipeField(seed, DifficultyNormal),
 		health: NewHealth(MaxHearts),
 		rng:    rand.New(rand.NewPCG(seed, seed>>1)),
 	}
@@ -564,14 +564,117 @@ func TestPickItemCanSpawnEveryKind(t *testing.T) {
 	}
 }
 
+func TestDifficultySpeedCurves(t *testing.T) {
+	normal, hard := DifficultyNormal, DifficultyHard
+
+	// 两种难度都从同样的速度起步。
+	if got := normal.SpeedAt(0); got != ScrollSpeed {
+		t.Fatalf("普通模式开局速度 %v, 期望 %v", got, ScrollSpeed)
+	}
+	if got := hard.SpeedAt(0); got != ScrollSpeed {
+		t.Fatalf("困难模式开局速度 %v, 期望 %v", got, ScrollSpeed)
+	}
+
+	// 困难模式提速更快：同样的存活时间速度更高，但不会超过上限。
+	for _, ticks := range []int{600, 1800, 3600} {
+		if hard.SpeedAt(ticks) <= normal.SpeedAt(ticks) {
+			t.Fatalf("%d tick 时困难模式速度 %v 应当高于普通模式 %v",
+				ticks, hard.SpeedAt(ticks), normal.SpeedAt(ticks))
+		}
+	}
+
+	// 普通上限不变，困难上限是普通的 1.5 倍，且再久也不会超过。
+	if got := normal.SpeedAt(1_000_000); got != ScrollSpeedMax {
+		t.Fatalf("普通模式上限 %v, 期望 %v", got, ScrollSpeedMax)
+	}
+	hardMax := ScrollSpeedMax * HardSpeedMaxScale
+	if got := hard.SpeedAt(1_000_000); got != hardMax {
+		t.Fatalf("困难模式上限 %v, 期望 %v", got, hardMax)
+	}
+	if hardMax > ScrollSpeedMax*1.5 {
+		t.Fatalf("困难模式上限 %v 超过普通上限的 1.5 倍", hardMax)
+	}
+
+	// 两头对齐：普通模式到不了困难模式的上限。
+	if normal.SpeedAt(1_000_000) >= hardMax {
+		t.Fatal("普通模式的速度不应达到困难模式的上限")
+	}
+}
+
+func TestDifficultyButtonsLayout(t *testing.T) {
+	if numDifficulties < 2 {
+		t.Fatalf("至少需要两个难度, 实际 %d", numDifficulties)
+	}
+
+	prevRight := 0.0
+	for i := 0; i < numDifficulties; i++ {
+		r := difficultyButtonRect(i)
+		if r.X < prevRight {
+			t.Fatalf("按钮 %d 与前一个按钮重叠", i)
+		}
+		if r.X < 0 || r.Right() > ScreenWidth {
+			t.Fatalf("按钮 %d 超出画面: x=%v..%v", i, r.X, r.Right())
+		}
+		prevRight = r.Right()
+
+		// 按钮中心应当命中自己。
+		if d, ok := hitTestDifficulty(r.X+r.W/2, r.Y+r.H/2); !ok || d != Difficulty(i) {
+			t.Fatalf("按钮 %d 的中心没有命中自己", i)
+		}
+	}
+
+	if _, ok := hitTestDifficulty(0, 0); ok {
+		t.Fatal("按钮之外的点击不应命中任何难度")
+	}
+}
+
+func TestTitleDifficultySelection(t *testing.T) {
+	s := newTitleScene()
+	g := newTestGame()
+
+	if s.selected != DifficultyNormal {
+		t.Fatalf("默认应当选中普通模式, 实际 %v", s.selected)
+	}
+
+	// 向左循环到最后一个难度，再向右回到普通。
+	g.input.menuDelta = -1
+	if err := s.Update(g); err != nil {
+		t.Fatal(err)
+	}
+	if s.selected != DifficultyHard {
+		t.Fatalf("向左应当循环到困难模式, 实际 %v", s.selected)
+	}
+	g.input.menuDelta = 1
+	if err := s.Update(g); err != nil {
+		t.Fatal(err)
+	}
+	if s.selected != DifficultyNormal {
+		t.Fatalf("向右应当回到普通模式, 实际 %v", s.selected)
+	}
+
+	// 点中「困难」按钮时应当用困难模式开始。
+	r := difficultyButtonRect(int(DifficultyHard))
+	g.input.hasPressPos = true
+	g.input.pressX, g.input.pressY = r.X+r.W/2, r.Y+r.H/2
+	if got := s.startDifficulty(g.input); got != DifficultyHard {
+		t.Fatalf("点击困难按钮应返回困难模式, 实际 %v", got)
+	}
+
+	// 键盘开始时沿用当前选中的难度。
+	g.input.hasPressPos = false
+	if got := s.startDifficulty(g.input); got != s.selected {
+		t.Fatalf("未点中按钮时应沿用当前选择, 实际 %v, 期望 %v", got, s.selected)
+	}
+}
+
 func TestScrollSpeedRampsLogarithmically(t *testing.T) {
-	if got := ScrollSpeedAt(0); got != ScrollSpeed {
+	if got := DifficultyNormal.SpeedAt(0); got != ScrollSpeed {
 		t.Fatalf("开局速度 %v, 期望 %v", got, ScrollSpeed)
 	}
 
-	prev := ScrollSpeedAt(0)
+	prev := DifficultyNormal.SpeedAt(0)
 	for ticks := 100; ticks <= 20000; ticks += 100 {
-		cur := ScrollSpeedAt(ticks)
+		cur := DifficultyNormal.SpeedAt(ticks)
 		if cur < prev {
 			t.Fatalf("速度不应随时间下降: %d tick 时 %v < %v", ticks, cur, prev)
 		}
@@ -582,20 +685,20 @@ func TestScrollSpeedRampsLogarithmically(t *testing.T) {
 	}
 
 	// 对数增长：同样长的存活区间，越靠后增量越小。
-	early := ScrollSpeedAt(1200) - ScrollSpeedAt(0)
-	late := ScrollSpeedAt(2400) - ScrollSpeedAt(1200)
+	early := DifficultyNormal.SpeedAt(1200) - DifficultyNormal.SpeedAt(0)
+	late := DifficultyNormal.SpeedAt(2400) - DifficultyNormal.SpeedAt(1200)
 	if late >= early {
 		t.Fatalf("增速应逐渐放缓: 前 1200 tick 增加 %v, 后 1200 tick 增加 %v", early, late)
 	}
 
 	// 存活再久也不会超过上限。
-	if got := ScrollSpeedAt(1_000_000); got != ScrollSpeedMax {
+	if got := DifficultyNormal.SpeedAt(1_000_000); got != ScrollSpeedMax {
 		t.Fatalf("超长时间存活后速度应为上限 %v, 实际 %v", ScrollSpeedMax, got)
 	}
 }
 
 func TestPipeFieldSpeedsUpOverTime(t *testing.T) {
-	f := NewPipeField(11)
+	f := NewPipeField(11, DifficultyNormal)
 	f.timer = math.MaxInt
 
 	pipe := f.Pipes()[0]
@@ -619,7 +722,7 @@ func TestPipeFieldSpeedsUpOverTime(t *testing.T) {
 }
 
 func TestPipeFieldCollides(t *testing.T) {
-	f := NewPipeField(3)
+	f := NewPipeField(3, DifficultyNormal)
 	f.timer = math.MaxInt
 	p := f.Pipes()[0]
 

@@ -27,7 +27,7 @@ func newPlayScene(g *Game) *playScene {
 
 	s := &playScene{
 		player: NewPlayer(float64(size.Dx()), float64(size.Dy())),
-		pipes:  NewPipeField(seed),
+		pipes:  NewPipeField(seed, g.difficulty),
 		health: NewHealth(MaxHearts),
 		rng:    rand.New(rand.NewPCG(seed+1, seed>>1)),
 	}

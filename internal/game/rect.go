@@ -15,6 +15,11 @@ func (r Rect) Right() float64 { return r.X + r.W }
 // Bottom 返回下边缘的 y 坐标。
 func (r Rect) Bottom() float64 { return r.Y + r.H }
 
+// Contains 报告点 (x, y) 是否落在矩形内（左闭右开，与 Intersects 的贴合语义一致）。
+func (r Rect) Contains(x, y float64) bool {
+	return x >= r.X && x < r.Right() && y >= r.Y && y < r.Bottom()
+}
+
 // Intersects 判断两个矩形是否相交。
 //
 // 这里用的是「分离轴」思想：只要在 x 方向或 y 方向上有一个方向不重叠，

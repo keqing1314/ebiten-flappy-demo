@@ -15,7 +15,13 @@ import (
 // 它们保证同一次按下只会在一个 tick 里返回 true，因此不需要我们再维护任何历史状态。
 type Input struct {
 	jumpPressed bool
-	touchIDs    []ebiten.TouchID
+	menuDelta   int // 本 tick 的菜单左右切换量：-1 向左，+1 向右
+
+	// 本 tick 点击（鼠标或触摸）的位置，用于判断点中了哪个按钮。
+	pressX, pressY float64
+	hasPressPos    bool
+
+	touchIDs []ebiten.TouchID
 }
 
 // Update 读取本 tick 的输入状态，必须在每个 tick 的最开始调用一次。
@@ -30,9 +36,40 @@ func (in *Input) Update() {
 		inpututil.IsKeyJustPressed(ebiten.KeyW) ||
 		inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) ||
 		len(in.touchIDs) > 0
+
+	in.menuDelta = 0
+	if inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft) || inpututil.IsKeyJustPressed(ebiten.KeyA) {
+		in.menuDelta--
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyArrowRight) || inpututil.IsKeyJustPressed(ebiten.KeyD) {
+		in.menuDelta++
+	}
+
+	// 记录本 tick 点击的位置：鼠标优先，其次是第一个刚按下的触摸点。
+	in.hasPressPos = false
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		x, y := ebiten.CursorPosition()
+		in.pressX, in.pressY, in.hasPressPos = float64(x), float64(y), true
+	}
+	for _, id := range in.touchIDs {
+		x, y := ebiten.TouchPosition(id)
+		in.pressX, in.pressY, in.hasPressPos = float64(x), float64(y), true
+		break
+	}
 }
 
 // JumpJustPressed 报告本 tick 是否发生了一次新的「拍翅膀」输入。
 func (in *Input) JumpJustPressed() bool {
 	return in.jumpPressed
+}
+
+// MenuDelta 返回本 tick 菜单选择的变化：-1 向左，+1 向右，0 不变。
+func (in *Input) MenuDelta() int {
+	return in.menuDelta
+}
+
+// PressPosition 返回本 tick 点击的位置（逻辑坐标），鼠标和触摸都支持。
+// ok 为 false 表示本 tick 的「按下」来自键盘，没有位置信息。
+func (in *Input) PressPosition() (x, y float64, ok bool) {
+	return in.pressX, in.pressY, in.hasPressPos
 }

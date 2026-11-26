@@ -52,6 +52,12 @@ func drawText(dst *ebiten.Image, s string, face *text.GoTextFace, x, y float64, 
 	text.Draw(dst, s, face, op)
 }
 
+// drawTextCenteredIn 在矩形 r 内水平、垂直居中地绘制文字。
+func drawTextCenteredIn(dst *ebiten.Image, s string, face *text.GoTextFace, r Rect, clr color.Color) {
+	w, h := text.Measure(s, face, face.Size)
+	drawText(dst, s, face, r.X+(r.W-w)/2, r.Y+(r.H-h)/2, clr)
+}
+
 // drawTextCentered 水平居中地绘制文字，y 是文字顶部的坐标。
 func drawTextCentered(dst *ebiten.Image, s string, face *text.GoTextFace, y float64, clr color.Color) {
 	w, _ := text.Measure(s, face, face.Size)

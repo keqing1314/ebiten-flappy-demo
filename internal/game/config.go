@@ -45,6 +45,11 @@ const (
 	ScrollSpeedRampTicks = 1200.0
 	// ScrollSpeedGain 是对数曲线的系数，决定速度总共能抬升多少。
 	ScrollSpeedGain = 0.8
+
+	// 困难模式的卷动速度：提速倍数是普通模式的 HardSpeedGainScale 倍，
+	// 速度上限是普通上限的 HardSpeedMaxScale 倍。
+	HardSpeedGainScale = 3.0
+	HardSpeedMaxScale  = 1.5
 	// PipeWidth 是管子的碰撞宽度，与 wall.png 的宽度（21px）一致。
 	PipeWidth = 21.0
 	// PipeInterval 是每隔多少个 tick 生成一根新管子。

@@ -25,6 +25,7 @@ go build -o ebiten-flappy-demo.exe .
 | 操作 | 按键 |
 | --- | --- |
 | 拍翅膀 / 开始 / 重来 | 鼠标左键、触摸、`Space`、`Enter`、`↑`、`W` |
+| 切换难度（标题画面） | `←` / `→` 或 `A` / `D`，也可以直接点难度按钮开始 |
 | 显示调试信息（FPS/TPS、碰撞盒） | `F1` |
 | 退出 | `Esc` |
 
@@ -86,6 +87,7 @@ ebiten-flappy-demo/
     │   ├── scene_play.go        游戏画面
     │   ├── scene_gameover.go    结束画面
     │   ├── player.go            主角：重力 + 跳跃的速度积分
+    │   ├── difficulty.go        难度模式与卷动速度曲线
     │   ├── health.go            血量、护盾与受伤后的无敌时间
     │   ├── item.go              道具系统（种类登记表 / 出现条件 / 拾取效果）
     │   ├── pipe.go              管子与管子管理器（生成 / 移动 / 计分 / 回收 / 携带道具）
@@ -130,10 +132,20 @@ ebiten-flappy-demo/
 按 `F1` 可以看到实际参与判定的矩形。
 
 **难度曲线**
-`pipe.go` 的 `ScrollSpeedAt` 让卷动速度随存活时间按对数增长：
-`speed = min(ScrollSpeedMax, ScrollSpeed + ScrollSpeedGain*ln(1+ticks/ScrollSpeedRampTicks))`。
-前期提速明显、之后逐渐放缓，最终停在 `ScrollSpeedMax`（约 1.8 倍开局速度）。
-对数曲线天然有上限，既能感觉到难度在涨，又不会快到无法反应。
+标题画面可以选择难度，两种模式只有卷动速度曲线不同。`difficulty.go` 的 `SpeedAt` 让速度随存活时间按对数增长：
+
+```text
+speed = min(该难度上限, ScrollSpeed + ScrollSpeedGain*提速倍数*ln(1+ticks/ScrollSpeedRampTicks))
+```
+
+| 模式 | 开局速度 | 提速倍数 | 速度上限 |
+| --- | --- | --- | --- |
+| `NORMAL` | 2.2 | 1× | 4.0 |
+| `HARD` | 2.2 | 3× | 6.0（普通上限的 1.5 倍） |
+
+困难模式开局和普通一样，但提速快 3 倍，约 77 秒到达 6.0 的上限；之后无论玩多久都不会更快。
+对数曲线保证了前期提升明显、之后逐渐放缓，上限则保证无论玩多久都不会快到无法反应。
+难度由标题画面选择，失败重来时沿用同一难度。
 
 **资源打包**
 `assets.go` 用 `//go:embed images/*.png` 把图片编译进二进制。
@@ -160,6 +172,8 @@ ebiten-flappy-demo/
 | `ScrollSpeedMax` | 卷动速度上限（存活再久也不会超过） | 4.0 |
 | `ScrollSpeedRampTicks` | 提速的时间尺度（tick），越大前期提速越慢 | 1200 |
 | `ScrollSpeedGain` | 对数曲线的增速系数 | 0.8 |
+| `HardSpeedGainScale` | 困难模式的提速倍数 | 3.0 |
+| `HardSpeedMaxScale` | 困难模式上限相对普通上限的倍数 | 1.5 |
 | `PipeInterval` | 每隔多少 tick 生成一根管子 | 100 |
 | `PipeGapHeight` | 空隙高度 | 150 |
 | `MaxGapDelta` | 相邻管子空隙中心的最大高度差 | 80 |
@@ -184,7 +198,8 @@ go test ./...
 覆盖的是不依赖窗口/GPU 的纯逻辑：矩形碰撞、跳跃与重力、管子生成节奏、计分与回收、
 相邻管子高度差限制，血量机制（无敌时间内不重复扣血、血量耗尽才判负、
 撞天花板/地板会扣血并把角色贴回屏幕内），道具（护盾吸收碰撞、回血封顶、缩小下限、
-出现条件与拾取），以及随存活时间提升的卷动速度（对数增长、增速逐渐放缓、始终不超过上限）。
+出现条件与拾取），随存活时间提升的卷动速度（对数增长、增速逐渐放缓、始终不超过上限），
+以及难度曲线（两种模式同起点、困难提速 3 倍且上限为普通的 1.5 倍）。
 这类逻辑抽成纯函数后，测试跑得飞快，也不需要图形环境。
 
 ## 可以继续练手的点

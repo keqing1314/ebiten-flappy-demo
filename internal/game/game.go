@@ -36,6 +36,8 @@ type Game struct {
 	scene Scene
 	input Input
 
+	difficulty Difficulty // 当前难度，由标题画面选择，重开一局时沿用
+
 	best  int  // 本次运行内的最高分
 	debug bool // 是否显示调试信息（F1 切换）
 }
