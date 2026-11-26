@@ -1,0 +1,129 @@
+# Flappy Gopher
+
+一个用 **完整 Ebitengine v2**（`github.com/hajimehoshi/ebiten/v2`）重写的入门示例。
+
+最初的版本是基于 [miniten](https://github.com/eihigh/miniten) 的教学 demo——miniten 把窗口、帧循环、
+输入、文字都封装好了，适合第一天上手，但看不到引擎真正的样子。
+这个版本不再使用任何封装，全部改用 Ebitengine 原生 API，并按真实项目的结构拆分文件。
+
+## 运行
+
+```bash
+go run .
+```
+
+编译成单个可执行文件（资源已通过 `go:embed` 打包进去，exe 可独立分发）：
+
+```bash
+go build -o ebiten-flappy-demo.exe .
+```
+
+环境要求：Go 1.25+。Windows / macOS / Linux 均可直接运行，无需安装任何 SDK 或运行库。
+
+## 操作
+
+| 操作 | 按键 |
+| --- | --- |
+| 拍翅膀 / 开始 / 重来 | 鼠标左键、触摸、`Space`、`Enter`、`↑`、`W` |
+| 显示调试信息（FPS/TPS、碰撞盒） | `F1` |
+| 退出 | `Esc` |
+
+> 界面文字使用英文：内置的像素字体 PressStart2P 只包含 ASCII 字形。
+> 想显示中文，需要在 `internal/assets` 里换成支持中文的字体（例如 M+ 或思源黑体）。
+
+## 项目结构
+
+```text
+ebiten-flappy-demo/
+├── main.go                      程序入口：窗口设置 + 启动游戏循环
+├── go.mod / go.sum
+└── internal/
+    ├── assets/
+    │   ├── assets.go            go:embed 加载贴图与字体
+    │   └── images/              sky.png / wall.png / gopher.png
+    ├── game/
+    │   ├── game.go              Game：实现 ebiten.Game（Update / Draw / Layout）
+    │   ├── scene.go             Scene 接口（画面状态机）
+    │   ├── scene_title.go       标题画面
+    │   ├── scene_play.go        游戏画面
+    │   ├── scene_gameover.go    结束画面
+    │   ├── player.go            主角：重力 + 跳跃的速度积分
+    │   ├── pipe.go              管子与管子管理器（生成 / 移动 / 计分 / 回收）
+    │   ├── input.go             统一的输入抽象（键盘 / 鼠标 / 触摸）
+    │   ├── draw.go              绘制工具（贴图、带阴影的文字、调试线框）
+    │   ├── rect.go              矩形与 AABB 碰撞
+    │   ├── config.go            所有可调参数
+    │   └── game_test.go         纯逻辑单元测试
+    └── sound/
+        └── sound.go             用代码合成 PCM 音效（无音频文件）
+```
+
+## 和 miniten 版本的对应关系
+
+| miniten | Ebitengine |
+| --- | --- |
+| `miniten.Run(draw)` | 实现 `ebiten.Game` 接口 + `ebiten.RunGame(g)` |
+| 全局变量 + `draw()` 里既算又画 | `Update()` 只算逻辑，`Draw()` 只画画面 |
+| `miniten.IsClicked()` + 手写 `isPrevClicked` | `inpututil.IsKeyJustPressed` / `IsMouseButtonJustPressed` |
+| `miniten.Println(...)` | `text/v2` 渲染真实字体（任意字号、对齐、描边） |
+| `miniten.DrawImage("x.png", x, y)` | `ebitenutil` 载入为 `*ebiten.Image` + `DrawImage` + `GeoM` |
+| 固定 640x360、无法缩放 | `Layout` 定义逻辑分辨率，窗口可自由拖动缩放，引擎负责等比缩放与黑边 |
+
+## 关键概念（对应到代码）
+
+**游戏循环与 TPS/FPS**
+引擎反复调用 `Game.Update`（固定 60 次/秒，由 `ebiten.SetTPS` 决定）和 `Game.Draw`
+（由显示器刷新率决定）。两者频率不同，所以**绝不能在 `Draw` 里改状态**，否则游戏速度会随显示器变化。
+调试模式下底部会显示实际的 TPS/FPS（见 `game.go`）。
+
+**逻辑分辨率**
+`Layout` 固定返回 `640x360`，绘制代码只关心这块虚拟画布，窗口大小、缩放、黑边全部交给引擎。
+
+**速度积分**
+`player.go` 用的是 `速度 += 重力；位置 += 速度` 的固定步长积分，
+配合 `MaxFallSpeed` 防止高速下落时穿透障碍物。
+
+**碰撞检测**
+`rect.go` 实现轴对齐矩形（AABB）相交判定，`pipe.go` 把每根管子拆成上下两个矩形。
+按 `F1` 可以看到实际参与判定的矩形。
+
+**资源打包**
+`assets.go` 用 `//go:embed images/*.png` 把图片编译进二进制。
+
+**音效**
+`sound.go` 直接用方波算出 PCM 数据（16 位、双声道、44100Hz），
+交给 `audio.NewPlayerFromBytes` 播放。没有音频设备时会自动静音，不影响游戏。
+
+## 可调参数
+
+都在 [`internal/game/config.go`](internal/game/config.go)：
+
+| 参数 | 含义 | 默认值 |
+| --- | --- | --- |
+| `ScreenWidth` / `ScreenHeight` | 逻辑分辨率 | 640 x 360 |
+| `WindowScale` | 窗口相对逻辑分辨率的倍数 | 2 |
+| `TPS` | 每秒逻辑更新次数 | 60 |
+| `Gravity` | 重力加速度（像素/tick²） | 0.4 |
+| `JumpVelocity` | 每次拍翅膀的初速度 | -6.5 |
+| `MaxFallSpeed` | 下落速度上限 | 9.0 |
+| `ScrollSpeed` | 场景卷动速度 | 2.2 |
+| `PipeInterval` | 每隔多少 tick 生成一根管子 | 100 |
+| `PipeGapHeight` | 空隙高度 | 150 |
+| `MaxGapDelta` | 相邻管子空隙中心的最大高度差 | 80 |
+
+## 测试
+
+```bash
+go test ./...
+```
+
+覆盖的是不依赖窗口/GPU 的纯逻辑：矩形碰撞、跳跃与重力、管子生成节奏、计分与回收、
+相邻管子高度差限制。这类逻辑抽成纯函数后，测试跑得飞快，也不需要图形环境。
+
+## 可以继续练手的点
+
+- 背景无缝滚动（两张图接力平移，用 `GeoM` 平移）
+- 用 `audio.NewInfiniteLoop` 加一段循环背景音乐
+- 把最高分写进本地 JSON 文件，实现真正的「一直保存」
+- 碰撞盒可视化做成可切换的开关，观察「视觉边缘」和「判定边缘」的差异
+- 试试 `ebiten.SetCursorMode`、`ebiten.SetFullscreen`、自定义着色器（`Kage`）
