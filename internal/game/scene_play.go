@@ -65,13 +65,13 @@ func (s *playScene) Update(g *Game) error {
 
 	// Hurt 在无敌时间内会返回 false：一次碰撞只会扣一颗心，不会连续掉血。
 	if hurt && s.health.Hurt() {
-		g.sfx.Hurt()
-
-		// 血量见底才算失败。
 		if s.health.Dead() {
+			// 最后一击不再播受伤音效，换成死亡音效，避免两个声音叠在一起。
+			g.sfx.Die()
 			g.recordBest(s.pipes.Score())
-			g.sfx.Hit()
 			g.switchTo(newGameOverScene(s))
+		} else {
+			g.sfx.Hurt()
 		}
 	}
 

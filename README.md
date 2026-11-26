@@ -43,7 +43,7 @@ go build -o ebiten-flappy-demo.exe .
 
 - 每次受伤后有 60 tick（1 秒）的**无敌时间**，期间角色半透明闪烁，再次碰撞不会扣血。
   没有它的话，角色贴住管子/地板的那几十个 tick 会被连续判定为碰撞，一次失误就掉光所有心。
-- 血量扣到 0 才算失败：此时播放失败音效并进入结束画面。
+- 血量扣到 0 才算失败：此时播放死亡音效并进入结束画面（最后一击只播死亡音效，不叠受伤音效）。
 - 血量、无敌时间的逻辑集中在 `internal/game/health.go`，与绘制、音效完全解耦，可以直接写单元测试。
 
 ## 项目结构
@@ -72,7 +72,8 @@ ebiten-flappy-demo/
     │   └── game_test.go         纯逻辑单元测试
     └── sound/
         ├── sound.go             合成音效 + 解码内嵌 mp3
-        └── hurt.mp3             受伤音效素材（go:embed 打包）
+        ├── hurt.mp3             受伤音效素材（go:embed 打包）
+        └── death.mp3            死亡音效素材（go:embed 打包）
 ```
 
 ## 和 miniten 版本的对应关系
@@ -109,8 +110,8 @@ ebiten-flappy-demo/
 
 **音效**
 `sound.go` 直接用方波算出 PCM 数据（16 位、双声道、44100Hz），
-交给 `audio.NewPlayerFromBytes` 播放。受伤音效 `hurt.mp3` 用 `go:embed` 打包进二进制，
-运行时由 `audio/mp3` 流式解码，并按音频上下文的采样率重采样。
+交给 `audio.NewPlayerFromBytes` 播放。受伤、死亡音效 `hurt.mp3` / `death.mp3`
+用 `go:embed` 打包进二进制，运行时由 `audio/mp3` 流式解码，并按音频上下文的采样率重采样。
 没有音频设备时会自动静音，不影响游戏。
 
 ## 可调参数
