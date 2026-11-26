@@ -2,6 +2,7 @@ package game
 
 import (
 	"math"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/keqing1314/ebiten-flappy-demo/internal/sound"
@@ -256,6 +257,264 @@ func TestPlaySceneFloorDrainsHeartsThenGameOver(t *testing.T) {
 	}
 	if _, ok := g.scene.(*gameOverScene); !ok {
 		t.Fatalf("血量耗尽后应当切换到结束画面, 实际场景类型 %T", g.scene)
+	}
+}
+
+func TestHealthShieldAbsorbsCollisions(t *testing.T) {
+	h := NewHealth(2)
+	h.AddShield(ItemHelmetCharges)
+	if got := h.ShieldCharges(); got != ItemHelmetCharges {
+		t.Fatalf("头盔层数 %d, 期望 %d", got, ItemHelmetCharges)
+	}
+
+	// 有护盾时碰撞只消耗护盾，不扣心血。
+	for i := 0; i < ItemHelmetCharges; i++ {
+		if !h.Hurt() {
+			t.Fatalf("第 %d 次碰撞应当生效", i+1)
+		}
+		if got := h.Hearts(); got != 2 {
+			t.Fatalf("有头盔时不应扣心, 剩余 %d 颗", got)
+		}
+		for j := 0; j < InvulnTicks; j++ {
+			h.Update()
+		}
+	}
+	if got := h.ShieldCharges(); got != 0 {
+		t.Fatalf("护盾应当耗尽, 剩余 %d 层", got)
+	}
+
+	// 护盾用完之后的碰撞才扣心。
+	if !h.Hurt() {
+		t.Fatal("护盾耗尽后的碰撞应当扣心")
+	}
+	if got := h.Hearts(); got != 1 {
+		t.Fatalf("护盾耗尽后应扣 1 颗心, 剩余 %d 颗", got)
+	}
+}
+
+func TestHealthAddShieldCaps(t *testing.T) {
+	h := NewHealth(MaxHearts)
+	h.AddShield(2)
+	h.AddShield(5)
+	if got := h.ShieldCharges(); got != MaxShield {
+		t.Fatalf("护盾层数应封顶在 %d, 实际 %d", MaxShield, got)
+	}
+}
+
+func TestHealthHealCapsAtMax(t *testing.T) {
+	h := NewHealth(MaxHearts)
+	if got := h.Heal(3); got != 0 {
+		t.Fatalf("满血时回血不应生效, 实际恢复 %d 颗", got)
+	}
+
+	h.Hurt()
+	for i := 0; i < InvulnTicks; i++ {
+		h.Update()
+	}
+	if got := h.Heal(5); got != 1 {
+		t.Fatalf("应当只恢复 1 颗心, 实际 %d 颗", got)
+	}
+	if got := h.Hearts(); got != MaxHearts {
+		t.Fatalf("回血后应回到上限 %d, 实际 %d", MaxHearts, got)
+	}
+}
+
+func TestPlayerShrinkClamps(t *testing.T) {
+	p := NewPlayer(60, 75)
+	cx, cy := p.X+p.W/2, p.Y+p.H/2
+
+	p.SetScale(ItemShrinkScale)
+
+	wantW, wantH := 60*ItemShrinkScale, 75*ItemShrinkScale
+	r := p.Rect()
+	if math.Abs(r.W-wantW) > 1e-9 || math.Abs(r.H-wantH) > 1e-9 {
+		t.Fatalf("缩小后碰撞盒 %vx%v, 期望 %vx%v", r.W, r.H, wantW, wantH)
+	}
+	// 缩放时中心应当保持不动。
+	if math.Abs(r.X+r.W/2-cx) > 1e-9 || math.Abs(r.Y+r.H/2-cy) > 1e-9 {
+		t.Fatalf("缩放后中心 (%v,%v) 偏离原中心 (%v,%v)", r.X+r.W/2, r.Y+r.H/2, cx, cy)
+	}
+
+	// 任何道具都不能把角色缩得比下限更小。
+	p.SetScale(0.01)
+	if p.Scale != PlayerMinScale {
+		t.Fatalf("缩放比例应停在下限 %v, 实际 %v", PlayerMinScale, p.Scale)
+	}
+}
+
+func TestPipeFieldCarriesAndCollectsItems(t *testing.T) {
+	f := NewPipeField(21)
+	f.spawnItem = func(speed float64) (ItemKind, bool) { return ItemHelmet, true }
+	f.pipes = nil
+	f.spawn()
+
+	p := f.Pipes()[0]
+	it := p.Item()
+	if it == nil {
+		t.Fatal("管子应当携带道具")
+	}
+	if it.Kind != ItemHelmet {
+		t.Fatalf("道具种类 %v, 期望头盔", it.Kind)
+	}
+
+	// 道具放在空隙中心（水平居中在管子上）。
+	if gapCenter := p.GapY + PipeGapHeight/2; math.Abs(it.Y+ItemSize/2-gapCenter) > 1e-9 {
+		t.Fatalf("道具未垂直居中于空隙: Y=%v, 空隙中心=%v", it.Y+ItemSize/2, gapCenter)
+	}
+	if wantX := p.X + (PipeWidth-ItemSize)/2; math.Abs(it.X-wantX) > 1e-9 {
+		t.Fatalf("道具未水平居中于管子: X=%v, 期望 %v", it.X, wantX)
+	}
+
+	// 道具跟随管子一起向左移动。
+	xBefore := it.X
+	f.Update(0)
+	if it.X >= xBefore {
+		t.Fatalf("道具应当随管子向左移动, %v -> %v", xBefore, it.X)
+	}
+
+	// 拾取后从管子上移除，不会重复拾取。
+	got := f.CollectItems(it.Rect())
+	if len(got) != 1 || got[0] != ItemHelmet {
+		t.Fatalf("拾取结果 %v, 期望 [头盔]", got)
+	}
+	if p.Item() != nil {
+		t.Fatal("拾取后道具应当被移除")
+	}
+	if again := f.CollectItems(it.Rect()); len(again) != 0 {
+		t.Fatalf("道具不应被重复拾取, 实际 %v", again)
+	}
+}
+
+// newItemPickupScene 创建一个角色正踩在道具上的场景，用来测试「拾取 → 生效」的整条链路。
+func newItemPickupScene(kind ItemKind) *playScene {
+	s := newTestPlayScene(MaxHearts)
+	s.pipes.timer = math.MaxInt
+	s.pipes.pipes = []*Pipe{{
+		X:    ScreenWidth, // 管子本体远离角色，不会产生碰撞干扰
+		GapY: 100,         // 空隙 100~250，正好包住角色
+		item: &Item{X: s.player.X, Y: s.player.Y, Kind: kind},
+	}}
+	return s
+}
+
+func TestPlaySceneAppliesPickedItems(t *testing.T) {
+	// 头盔：立刻获得护盾层数，道具从管子上消失。
+	s := newItemPickupScene(ItemHelmet)
+	if err := s.Update(newTestGame()); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.health.ShieldCharges(); got != ItemHelmetCharges {
+		t.Fatalf("拾取头盔后护盾层数 %d, 期望 %d", got, ItemHelmetCharges)
+	}
+	if it := s.pipes.Pipes()[0].Item(); it != nil {
+		t.Fatal("拾取后道具应当从管子上移除")
+	}
+
+	// 缩小：角色体型变小。
+	s = newItemPickupScene(ItemShrink)
+	if err := s.Update(newTestGame()); err != nil {
+		t.Fatal(err)
+	}
+	if s.player.Scale != ItemShrinkScale {
+		t.Fatalf("拾取缩小道具后缩放比例 %v, 期望 %v", s.player.Scale, ItemShrinkScale)
+	}
+
+	// 回血：补回失去的心。
+	s = newItemPickupScene(ItemHeart)
+	s.health.Hurt()
+	if err := s.Update(newTestGame()); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.health.Hearts(); got != MaxHearts {
+		t.Fatalf("拾取回血道具后应回满, 实际 %d 颗", got)
+	}
+
+	// 减速：卷动速度下降。
+	s = newItemPickupScene(ItemSlow)
+	before := s.pipes.Speed()
+	if err := s.Update(newTestGame()); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.pipes.Speed(); got >= before {
+		t.Fatalf("拾取减速道具后速度应下降: %v -> %v", before, got)
+	}
+}
+
+func TestPipeFieldSlowDown(t *testing.T) {
+	f := NewPipeField(2)
+	f.ticks = 3600 // 存活一分钟，速度已经明显高于开局
+	base := f.Speed()
+
+	f.SlowDown(ItemSlowAmount)
+	if got := f.Speed(); math.Abs(got-(base-ItemSlowAmount)) > 1e-9 {
+		t.Fatalf("减速后速度 %v, 期望 %v", got, base-ItemSlowAmount)
+	}
+
+	// 减速有下限，不会把速度压到停滞。
+	f.SlowDown(100)
+	if got := f.Speed(); got != ScrollSpeedFloor {
+		t.Fatalf("减速下限应为 %v, 实际 %v", ScrollSpeedFloor, got)
+	}
+}
+
+// newTestItemScene 创建一个只用于测试道具规则的最小场景（不需要图形环境）。
+func newTestItemScene(seed uint64) *playScene {
+	return &playScene{
+		player: NewPlayer(60, 75),
+		pipes:  NewPipeField(seed),
+		health: NewHealth(MaxHearts),
+		rng:    rand.New(rand.NewPCG(seed, seed>>1)),
+	}
+}
+
+func TestPickItemRespectsConditions(t *testing.T) {
+	// 速度没到门槛时不刷减速道具；满血时不刷回血道具。
+	s := newTestItemScene(1)
+	for i := 0; i < 5000; i++ {
+		kind, ok := s.pickItem(ItemSlowMinSpeed - 0.1)
+		if !ok {
+			continue
+		}
+		switch kind {
+		case ItemSlow:
+			t.Fatal("速度未达标时不应刷出减速道具")
+		case ItemHeart:
+			t.Fatal("满血时不应刷出回血道具")
+		}
+	}
+
+	// 已经缩小时不再刷缩小道具，头盔层数已满时不再刷头盔。
+	s.player.SetScale(PlayerMinScale)
+	s.health.AddShield(MaxShield)
+	for i := 0; i < 5000; i++ {
+		kind, ok := s.pickItem(ScrollSpeed)
+		if !ok {
+			continue
+		}
+		switch kind {
+		case ItemShrink:
+			t.Fatal("已经缩小时不应再刷出缩小道具")
+		case ItemHelmet:
+			t.Fatal("头盔层数已满时不应再刷出头盔")
+		}
+	}
+}
+
+func TestPickItemCanSpawnEveryKind(t *testing.T) {
+	s := newTestItemScene(7)
+	s.health.Hurt() // 掉一颗心，留出回血空间
+
+	seen := map[ItemKind]bool{}
+	for i := 0; i < 5000; i++ {
+		if kind, ok := s.pickItem(ItemSlowMinSpeed + 0.5); ok {
+			seen[kind] = true
+		}
+	}
+
+	for _, kind := range []ItemKind{ItemHeart, ItemHelmet, ItemShrink, ItemSlow} {
+		if !seen[kind] {
+			t.Fatalf("道具 %v 在 5000 次生成中从未出现", kind)
+		}
 	}
 }
 

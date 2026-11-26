@@ -1,6 +1,10 @@
 package game
 
-import "github.com/hajimehoshi/ebiten/v2"
+import (
+	"math"
+
+	"github.com/hajimehoshi/ebiten/v2"
+)
 
 // Player 是玩家控制的地鼠。
 //
@@ -12,20 +16,35 @@ import "github.com/hajimehoshi/ebiten/v2"
 //
 // 坐标 (X, Y) 是角色碰撞盒的左上角。
 type Player struct {
-	X, Y float64
-	W, H float64
-	VelY float64 // 竖直速度，单位：像素/tick，向下为正
+	X, Y  float64
+	W, H  float64 // 贴图原始尺寸；碰撞盒与绘制都会再乘上 Scale
+	Scale float64 // 缩放比例，1 是原始大小（缩小道具会把它调小）
+	VelY  float64 // 竖直速度，单位：像素/tick，向下为正
 }
 
 // NewPlayer 在屏幕左侧、垂直居中的位置创建一个静止的角色。
 // 尺寸取自贴图本身（gopher.png 是 60x75），这样换素材时不需要改代码。
 func NewPlayer(w, h float64) *Player {
 	return &Player{
-		X: PlayerX,
-		Y: (ScreenHeight - h) / 2,
-		W: w,
-		H: h,
+		X:     PlayerX,
+		Y:     (ScreenHeight - h) / 2,
+		W:     w,
+		H:     h,
+		Scale: 1,
 	}
+}
+
+// SetScale 设置缩放比例（缩小道具用），不会小于 PlayerMinScale，
+// 否则角色会小到几乎撞不到管子，游戏就没难度了。
+//
+// 缩放时保持角色中心不动，否则体型突然变化会让角色看起来「跳」了一下。
+func (p *Player) SetScale(scale float64) {
+	newScale := math.Max(scale, PlayerMinScale)
+	cx := p.X + p.W*p.Scale/2
+	cy := p.Y + p.H*p.Scale/2
+	p.Scale = newScale
+	p.X = cx - p.W*p.Scale/2
+	p.Y = cy - p.H*p.Scale/2
 }
 
 // Jump 给角色一个向上的初速度。
@@ -42,15 +61,16 @@ func (p *Player) Update() {
 	p.Y += p.VelY
 }
 
-// Rect 返回当前的碰撞盒。
+// Rect 返回当前的碰撞盒（体型会随 Scale 变化）。
 func (p *Player) Rect() Rect {
-	return Rect{X: p.X, Y: p.Y, W: p.W, H: p.H}
+	return Rect{X: p.X, Y: p.Y, W: p.W * p.Scale, H: p.H * p.Scale}
 }
 
-// Draw 把角色贴图画到当前位置。
+// Draw 把角色贴图按当前缩放画到当前位置。
 // alpha 是不透明度（0~1），受伤后的无敌时间用它来做闪烁提示。
 func (p *Player) Draw(dst, img *ebiten.Image, alpha float64) {
 	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(p.Scale, p.Scale)
 	op.GeoM.Translate(p.X, p.Y)
 	op.ColorScale.ScaleAlpha(float32(alpha))
 	dst.DrawImage(img, op)

@@ -85,3 +85,30 @@ const (
 	HeartMarginX = 10.0
 	HeartMarginY = 10.0
 )
+
+// 道具。
+const (
+	// ItemSpawnChance 是每根新管子携带道具的概率。
+	ItemSpawnChance = 0.3
+	// ItemSize 是道具在画面上的显示尺寸，同时也是它的碰撞盒边长。
+	// 道具贴图四周留白较多，实际可见的图案大约是它的 2/3。
+	ItemSize = 40.0
+
+	// ItemHelmetCharges 是捡到一次头盔获得的免疫次数，MaxShield 是护盾层数上限。
+	// 有护盾时碰撞只消耗护盾、不扣心血。
+	ItemHelmetCharges = 3
+	MaxShield         = 3
+
+	// ItemShrinkScale 把角色缩小到原尺寸的 1/3。
+	// PlayerMinScale 是缩小的下限：再小就几乎撞不到东西了，道具会变成无敌。
+	ItemShrinkScale = 1.0 / 3.0
+	PlayerMinScale  = ItemShrinkScale
+
+	// ItemSlowAmount 是每个减速道具带来的永久减速量（像素/tick），
+	// 减速不会把速度压到 ScrollSpeedFloor 以下。
+	ItemSlowAmount   = 0.4
+	ScrollSpeedFloor = 1.8
+	// ItemSlowMinSpeed 是减速道具出现所需的最低卷动速度：
+	// 速度还不够快时刷出减速道具没有意义，所以只在速度达标后才可能出现。
+	ItemSlowMinSpeed = 3.0
+)

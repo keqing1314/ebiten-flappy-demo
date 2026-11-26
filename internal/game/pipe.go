@@ -18,7 +18,13 @@ type Pipe struct {
 	X    float64 // 管子左边缘的 x 坐标
 	GapY float64 // 空隙上边缘的 y 坐标
 
-	scored bool // 是否已经为这根管子加过分，保证一根管子只加一次
+	scored bool  // 是否已经为这根管子加过分，保证一根管子只加一次
+	item   *Item // 空隙中心可能挂着一个道具，nil 表示没有
+}
+
+// Item 返回管子上挂着的道具，没有时返回 nil。
+func (p *Pipe) Item() *Item {
+	return p.item
 }
 
 // TopRect 返回上半根管子的碰撞盒。
@@ -65,14 +71,25 @@ func ScrollSpeedAt(ticks int) float64 {
 	return speed
 }
 
+// itemPicker 决定一根新管子是否携带道具，speed 是生成时的卷动速度。
+// 返回 false 表示这根管子没有道具。
+//
+// 道具规则要参考血条、角色大小等场景状态，所以由场景提供这个回调，
+// 管子区域本身不需要知道这些细节。
+type itemPicker func(speed float64) (ItemKind, bool)
+
 // PipeField 负责管理屏幕上所有管子：生成、移动、计分、回收。
 type PipeField struct {
 	pipes      []*Pipe
-	timer      int // 距离下一次生成还有多少 tick
-	ticks      int // 已经存活了多少个 tick，用来计算随存活时间提升的卷动速度
+	timer      int     // 距离下一次生成还有多少 tick
+	ticks      int     // 已经存活了多少个 tick，用来计算随存活时间提升的卷动速度
+	slowOffset float64 // 减速道具累计带来的减速量
 	rng        *rand.Rand
 	score      int
 	lastCenter float64 // 上一根管子空隙中心的高度，用来限制变化幅度
+
+	// spawnItem 决定新管子要不要带道具；为 nil 时不生成道具（单元测试里通常为 nil）。
+	spawnItem itemPicker
 }
 
 // NewPipeField 创建一片管子区域，并立刻生成第一根。
@@ -99,14 +116,33 @@ func (f *PipeField) Pipes() []*Pipe {
 	return f.pipes
 }
 
+// Speed 返回当前的卷动速度（像素/tick）：
+// 对数难度曲线减去道具带来的减速，且不会低于 ScrollSpeedFloor。
+func (f *PipeField) Speed() float64 {
+	speed := ScrollSpeedAt(f.ticks) - f.slowOffset
+	if speed < ScrollSpeedFloor {
+		return ScrollSpeedFloor
+	}
+	return speed
+}
+
+// SlowDown 永久降低卷动速度（减速道具的效果），不会低于 ScrollSpeedFloor。
+func (f *PipeField) SlowDown(amount float64) {
+	f.slowOffset += amount
+}
+
 // Update 推进一个 tick：移动（速度随存活时间提升）→ 计分 → 回收 → 生成。
 // playerX 是角色左边缘的 x 坐标，用来判断管子是否已经被甩到身后。
 func (f *PipeField) Update(playerX float64) {
 	f.ticks++
-	speed := ScrollSpeedAt(f.ticks)
+	speed := f.Speed()
 
 	for _, p := range f.pipes {
 		p.X -= speed
+		if p.item != nil {
+			// 道具跟着管子走，始终停在空隙中心。
+			p.item.X -= speed
+		}
 
 		// 管子整体越过角色左边缘，说明玩家成功穿过，记 1 分（每根只记一次）。
 		if !p.scored && p.X+PipeWidth < playerX {
@@ -119,7 +155,10 @@ func (f *PipeField) Update(playerX float64) {
 	// 这里复用底层数组（pipes[:0]），避免每次 Update 都分配新内存。
 	alive := f.pipes[:0]
 	for _, p := range f.pipes {
-		if p.X+PipeWidth > 0 {
+		// 道具比管子宽，所以管子出屏后还要等道具也完全移出屏幕才能回收，
+		// 否则道具会在屏幕边缘突然消失。
+		itemVisible := p.item != nil && p.item.X+ItemSize > 0
+		if p.X+PipeWidth > 0 || itemVisible {
 			alive = append(alive, p)
 		}
 	}
@@ -131,6 +170,22 @@ func (f *PipeField) Update(playerX float64) {
 		f.spawn()
 		f.timer = PipeInterval
 	}
+}
+
+// CollectItems 拾取与 body 相交的所有道具，返回它们的种类。
+// 被拾取的道具会立刻从管子上移除，同一帧不会重复触发。
+func (f *PipeField) CollectItems(body Rect) []ItemKind {
+	var kinds []ItemKind
+	for _, p := range f.pipes {
+		if p.item == nil {
+			continue
+		}
+		if body.Intersects(p.item.Rect()) {
+			kinds = append(kinds, p.item.Kind)
+			p.item = nil
+		}
+	}
+	return kinds
 }
 
 // Collides 判断给定矩形是否撞到了任意一根管子。
@@ -154,8 +209,21 @@ func (f *PipeField) spawn() {
 	center = math.Min(math.Max(center, minGapCenter), maxGapCenter)
 	f.lastCenter = center
 
-	f.pipes = append(f.pipes, &Pipe{
+	p := &Pipe{
 		X:    ScreenWidth,
 		GapY: center - PipeGapHeight/2,
-	})
+	}
+
+	// 道具随机放在空隙中心：水平居中在管子上，垂直居中在空隙里。
+	if f.spawnItem != nil {
+		if kind, ok := f.spawnItem(f.Speed()); ok {
+			p.item = &Item{
+				X:    p.X + (PipeWidth-ItemSize)/2,
+				Y:    center - ItemSize/2,
+				Kind: kind,
+			}
+		}
+	}
+
+	f.pipes = append(f.pipes, p)
 }

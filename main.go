@@ -10,7 +10,7 @@
 // 代码结构：
 //
 //	main.go              程序入口：配置窗口并启动游戏循环
-//	internal/game/       游戏逻辑与绘制（场景、角色、管子、输入、工具函数）
+//	internal/game/       游戏逻辑与绘制（场景、角色、管子、道具、输入、工具函数）
 //	internal/assets/     贴图与字体（含 go:embed）
 //	internal/sound/      合成音效与内嵌的 mp3 音效（受伤 / 死亡）
 package main

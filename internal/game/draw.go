@@ -26,6 +26,17 @@ func drawSprite(dst, img *ebiten.Image, x, y float64) {
 	dst.DrawImage(img, op)
 }
 
+// drawSpriteScaled 把贴图等比缩放到边长 size 后画在左上角 (x, y)。
+// alpha 是不透明度（0~1）。
+func drawSpriteScaled(dst, img *ebiten.Image, x, y, size, alpha float64) {
+	scale := size / float64(img.Bounds().Dy())
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleAlpha(float32(alpha))
+	dst.DrawImage(img, op)
+}
+
 // drawText 在坐标 (x, y) 处绘制带阴影的文字。
 // 阴影让文字在花哨的背景上依然清晰，是像素风界面常用的技巧。
 func drawText(dst *ebiten.Image, s string, face *text.GoTextFace, x, y float64, clr color.Color) {
