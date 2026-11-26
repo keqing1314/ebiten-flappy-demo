@@ -20,6 +20,8 @@ type Player struct {
 	W, H  float64 // 贴图原始尺寸；碰撞盒与绘制都会再乘上 Scale
 	Scale float64 // 缩放比例，1 是原始大小（缩小道具会把它调小）
 	VelY  float64 // 竖直速度，单位：像素/tick，向下为正
+
+	shrinkTicks int // 缩小效果还剩多少 tick，0 表示没有缩小
 }
 
 // NewPlayer 在屏幕左侧、垂直居中的位置创建一个静止的角色。
@@ -34,7 +36,14 @@ func NewPlayer(w, h float64) *Player {
 	}
 }
 
-// SetScale 设置缩放比例（缩小道具用），不会小于 PlayerMinScale，
+// Shrink 让角色缩小，并在 ticks 个 tick 后自动恢复原尺寸（缩小道具的效果）。
+// 缩小时再捡到缩小道具会刷新持续时间。
+func (p *Player) Shrink(ticks int) {
+	p.SetScale(ItemShrinkScale)
+	p.shrinkTicks = ticks
+}
+
+// SetScale 设置缩放比例，不会小于 PlayerMinScale，
 // 否则角色会小到几乎撞不到管子，游戏就没难度了。
 //
 // 缩放时保持角色中心不动，否则体型突然变化会让角色看起来「跳」了一下。
@@ -59,6 +68,14 @@ func (p *Player) Update() {
 		p.VelY = MaxFallSpeed
 	}
 	p.Y += p.VelY
+
+	// 缩小是有时限的：时间一到就恢复原尺寸。
+	if p.shrinkTicks > 0 {
+		p.shrinkTicks--
+		if p.shrinkTicks == 0 {
+			p.SetScale(1)
+		}
+	}
 }
 
 // Rect 返回当前的碰撞盒（体型会随 Scale 变化）。

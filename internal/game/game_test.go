@@ -342,6 +342,48 @@ func TestPlayerShrinkClamps(t *testing.T) {
 	}
 }
 
+func TestPlayerShrinkExpires(t *testing.T) {
+	p := NewPlayer(60, 75)
+	p.Shrink(ItemShrinkTicks)
+	if p.Scale != ItemShrinkScale {
+		t.Fatalf("拾取缩小道具后比例 %v, 期望 %v", p.Scale, ItemShrinkScale)
+	}
+
+	// 持续时间还没到，仍然是缩小的。
+	for i := 0; i < ItemShrinkTicks-1; i++ {
+		p.Update()
+	}
+	if p.Scale != ItemShrinkScale {
+		t.Fatal("持续时间还没到就不应该恢复")
+	}
+
+	// 时间到，恢复原尺寸与碰撞盒。
+	p.Update()
+	if p.Scale != 1 {
+		t.Fatalf("缩小效果到期后应恢复原尺寸, 实际比例 %v", p.Scale)
+	}
+	if r := p.Rect(); math.Abs(r.W-60) > 1e-9 || math.Abs(r.H-75) > 1e-9 {
+		t.Fatalf("恢复后碰撞盒 %vx%v, 期望 60x75", r.W, r.H)
+	}
+}
+
+func TestPlayerShrinkRefreshes(t *testing.T) {
+	p := NewPlayer(60, 75)
+	p.Shrink(ItemShrinkTicks)
+	for i := 0; i < ItemShrinkTicks-10; i++ {
+		p.Update()
+	}
+
+	// 缩小时再吃一个，应该重新计时而不是立刻恢复。
+	p.Shrink(ItemShrinkTicks)
+	for i := 0; i < ItemShrinkTicks-1; i++ {
+		p.Update()
+	}
+	if p.Scale != ItemShrinkScale {
+		t.Fatal("重复拾取缩小道具应当刷新持续时间")
+	}
+}
+
 func TestPipeFieldCarriesAndCollectsItems(t *testing.T) {
 	f := NewPipeField(21)
 	f.spawnItem = func(speed float64) (ItemKind, bool) { return ItemHelmet, true }
@@ -483,20 +525,24 @@ func TestPickItemRespectsConditions(t *testing.T) {
 		}
 	}
 
-	// 已经缩小时不再刷缩小道具，头盔层数已满时不再刷头盔。
-	s.player.SetScale(PlayerMinScale)
+	// 头盔层数已满时不再刷头盔；缩小道具则仍然可以出现（用来刷新持续时间）。
+	s.player.Shrink(ItemShrinkTicks)
 	s.health.AddShield(MaxShield)
+	sawShrink := false
 	for i := 0; i < 5000; i++ {
 		kind, ok := s.pickItem(ScrollSpeed)
 		if !ok {
 			continue
 		}
-		switch kind {
-		case ItemShrink:
-			t.Fatal("已经缩小时不应再刷出缩小道具")
-		case ItemHelmet:
+		if kind == ItemHelmet {
 			t.Fatal("头盔层数已满时不应再刷出头盔")
 		}
+		if kind == ItemShrink {
+			sawShrink = true
+		}
+	}
+	if !sawShrink {
+		t.Fatal("缩小状态下缩小道具仍应出现，用于刷新持续时间")
 	}
 }
 

@@ -84,6 +84,12 @@ const (
 	// HeartMarginX、HeartMarginY 是血条距离画面左上角的边距。
 	HeartMarginX = 10.0
 	HeartMarginY = 10.0
+
+	// ShieldIconSize、ShieldIconOffsetY 是 HUD 上头盔图标的画布尺寸与垂直偏移。
+	// 头盔贴图的图案只占画布高度的约 9/16（心形约占 7/8），所以画布要比心形图标大一些，
+	// 再稍微上移，图案看起来才和心一样大、并排在同一行。
+	ShieldIconSize    = 34.0
+	ShieldIconOffsetY = -4.0
 )
 
 // 道具。
@@ -103,6 +109,8 @@ const (
 	// PlayerMinScale 是缩小的下限：再小就几乎撞不到东西了，道具会变成无敌。
 	ItemShrinkScale = 1.0 / 3.0
 	PlayerMinScale  = ItemShrinkScale
+	// ItemShrinkTicks 是缩小效果的持续时间（5 秒），到期后角色自动恢复原尺寸。
+	ItemShrinkTicks = 5 * TPS
 
 	// ItemSlowAmount 是每个减速道具带来的永久减速量（像素/tick），
 	// 减速不会把速度压到 ScrollSpeedFloor 以下。

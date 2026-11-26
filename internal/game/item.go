@@ -74,13 +74,11 @@ var itemSpecs = []itemSpec{
 		Apply: func(s *playScene) { s.health.AddShield(ItemHelmetCharges) },
 	},
 	{
+		// 缩小时再捡到会在原来的基础上刷新持续时间，所以没有额外的出现条件。
 		Kind:   ItemShrink,
 		Weight: 20,
-		CanPick: func(s *playScene) bool {
-			return s.player.Scale > PlayerMinScale
-		},
-		Image: func(a *assets.Assets) *ebiten.Image { return a.ItemShrink },
-		Apply: func(s *playScene) { s.player.SetScale(ItemShrinkScale) },
+		Image:  func(a *assets.Assets) *ebiten.Image { return a.ItemShrink },
+		Apply:  func(s *playScene) { s.player.Shrink(ItemShrinkTicks) },
 	},
 	{
 		Kind:     ItemSlow,

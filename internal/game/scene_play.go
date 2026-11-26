@@ -159,10 +159,10 @@ func (s *playScene) drawShield(g *Game, screen *ebiten.Image) {
 		return
 	}
 
-	// 紧跟在最后一颗心后面。
+	// 紧跟在最后一颗心后面。头盔贴图留白多，画布要放大一些，图案才和心一样大。
 	x := HeartMarginX + float64(s.health.Max())*(HeartSize+HeartGap)
 	alpha := 0.25 + 0.75*float64(charges)/float64(MaxShield)
-	drawSpriteScaled(screen, g.assets.ItemHelmet, x, HeartMarginY, HeartSize, alpha)
+	drawSpriteScaled(screen, g.assets.ItemHelmet, x, HeartMarginY+ShieldIconOffsetY, ShieldIconSize, alpha)
 }
 
 // drawDebug 在调试模式下显示所有碰撞盒。
