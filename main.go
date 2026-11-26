@@ -4,7 +4,7 @@
 //   - 窗口与帧循环：自己实现 ebiten.Game 接口（Update / Draw / Layout）
 //   - 输入：用 inpututil 做「本 tick 刚刚按下」的边沿检测
 //   - 文字：用 text/v2 渲染矢量字体（支持任意字号）
-//   - 音效：用 audio 包播放现场合成出来的 PCM 数据
+//   - 音效：用 audio 包播放现场合成的 PCM 数据，以及解码内嵌的 mp3 受伤音效
 //   - 资源：用 go:embed 打包进二进制，单个 exe 即可运行
 //
 // 代码结构：
@@ -12,7 +12,7 @@
 //	main.go              程序入口：配置窗口并启动游戏循环
 //	internal/game/       游戏逻辑与绘制（场景、角色、管子、输入、工具函数）
 //	internal/assets/     贴图与字体（含 go:embed）
-//	internal/sound/      代码合成的音效
+//	internal/sound/      合成音效与内嵌的 mp3 受伤音效
 package main
 
 import (

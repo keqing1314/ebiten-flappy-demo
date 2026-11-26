@@ -48,6 +48,10 @@ func (p *Player) Rect() Rect {
 }
 
 // Draw 把角色贴图画到当前位置。
-func (p *Player) Draw(dst, img *ebiten.Image) {
-	drawSprite(dst, img, p.X, p.Y)
+// alpha 是不透明度（0~1），受伤后的无敌时间用它来做闪烁提示。
+func (p *Player) Draw(dst, img *ebiten.Image, alpha float64) {
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(p.X, p.Y)
+	op.ColorScale.ScaleAlpha(float32(alpha))
+	dst.DrawImage(img, op)
 }

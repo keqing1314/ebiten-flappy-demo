@@ -31,6 +31,21 @@ go build -o ebiten-flappy-demo.exe .
 > 界面文字使用英文：内置的像素字体 PressStart2P 只包含 ASCII 字形。
 > 想显示中文，需要在 `internal/assets` 里换成支持中文的字体（例如 M+ 或思源黑体）。
 
+## 血量机制
+
+角色默认有 **6 颗心**，左上角的血条会实时显示剩余血量（已失去的心用半透明图标占位）。
+
+| 碰撞对象 | 效果 |
+| --- | --- |
+| 管子 | 扣 1 颗心，播放受伤音效 |
+| 天花板 | 扣 1 颗心，角色被贴回屏幕内 |
+| 地板 | 扣 1 颗心，角色被贴回屏幕内 |
+
+- 每次受伤后有 60 tick（1 秒）的**无敌时间**，期间角色半透明闪烁，再次碰撞不会扣血。
+  没有它的话，角色贴住管子/地板的那几十个 tick 会被连续判定为碰撞，一次失误就掉光所有心。
+- 血量扣到 0 才算失败：此时播放失败音效并进入结束画面。
+- 血量、无敌时间的逻辑集中在 `internal/game/health.go`，与绘制、音效完全解耦，可以直接写单元测试。
+
 ## 项目结构
 
 ```text
@@ -40,7 +55,7 @@ ebiten-flappy-demo/
 └── internal/
     ├── assets/
     │   ├── assets.go            go:embed 加载贴图与字体
-    │   └── images/              sky.png / wall.png / gopher.png
+    │   └── images/              sky.png / wall.png / gopher.png / heart.png
     ├── game/
     │   ├── game.go              Game：实现 ebiten.Game（Update / Draw / Layout）
     │   ├── scene.go             Scene 接口（画面状态机）
@@ -48,6 +63,7 @@ ebiten-flappy-demo/
     │   ├── scene_play.go        游戏画面
     │   ├── scene_gameover.go    结束画面
     │   ├── player.go            主角：重力 + 跳跃的速度积分
+    │   ├── health.go            血量与受伤后的无敌时间
     │   ├── pipe.go              管子与管子管理器（生成 / 移动 / 计分 / 回收）
     │   ├── input.go             统一的输入抽象（键盘 / 鼠标 / 触摸）
     │   ├── draw.go              绘制工具（贴图、带阴影的文字、调试线框）
@@ -55,7 +71,8 @@ ebiten-flappy-demo/
     │   ├── config.go            所有可调参数
     │   └── game_test.go         纯逻辑单元测试
     └── sound/
-        └── sound.go             用代码合成 PCM 音效（无音频文件）
+        ├── sound.go             合成音效 + 解码内嵌 mp3
+        └── hurt.mp3             受伤音效素材（go:embed 打包）
 ```
 
 ## 和 miniten 版本的对应关系
@@ -92,7 +109,9 @@ ebiten-flappy-demo/
 
 **音效**
 `sound.go` 直接用方波算出 PCM 数据（16 位、双声道、44100Hz），
-交给 `audio.NewPlayerFromBytes` 播放。没有音频设备时会自动静音，不影响游戏。
+交给 `audio.NewPlayerFromBytes` 播放。受伤音效 `hurt.mp3` 用 `go:embed` 打包进二进制，
+运行时由 `audio/mp3` 流式解码，并按音频上下文的采样率重采样。
+没有音频设备时会自动静音，不影响游戏。
 
 ## 可调参数
 
@@ -110,6 +129,9 @@ ebiten-flappy-demo/
 | `PipeInterval` | 每隔多少 tick 生成一根管子 | 100 |
 | `PipeGapHeight` | 空隙高度 | 150 |
 | `MaxGapDelta` | 相邻管子空隙中心的最大高度差 | 80 |
+| `MaxHearts` | 初始血量（心数） | 6 |
+| `InvulnTicks` | 受伤后的无敌时间（tick） | 60 |
+| `HeartSize` | HUD 上心形图标的显示尺寸 | 22 |
 
 ## 测试
 
@@ -118,7 +140,8 @@ go test ./...
 ```
 
 覆盖的是不依赖窗口/GPU 的纯逻辑：矩形碰撞、跳跃与重力、管子生成节奏、计分与回收、
-相邻管子高度差限制。这类逻辑抽成纯函数后，测试跑得飞快，也不需要图形环境。
+相邻管子高度差限制，以及血量机制（无敌时间内不重复扣血、血量耗尽才判负、
+撞天花板/地板会扣血并把角色贴回屏幕内）。这类逻辑抽成纯函数后，测试跑得飞快，也不需要图形环境。
 
 ## 可以继续练手的点
 

@@ -3,6 +3,8 @@ package game
 import (
 	"math"
 	"testing"
+
+	"github.com/keqing1314/ebiten-flappy-demo/internal/sound"
 )
 
 func TestRectIntersects(t *testing.T) {
@@ -121,6 +123,139 @@ func TestPipeFieldGapChangeIsLimited(t *testing.T) {
 			t.Fatalf("相邻管子空隙中心变化 %v，超过上限 %v", math.Abs(cur-prev), MaxGapDelta)
 		}
 		prev = cur
+	}
+}
+
+func TestHealthHurtAndInvulnerability(t *testing.T) {
+	h := NewHealth(MaxHearts)
+	if h.Hearts() != MaxHearts || h.Max() != MaxHearts || h.Dead() {
+		t.Fatalf("满血状态不正确: hearts=%d max=%d", h.Hearts(), h.Max())
+	}
+
+	if !h.Hurt() {
+		t.Fatal("满血时第一次碰撞应当扣血")
+	}
+	if got := h.Hearts(); got != MaxHearts-1 {
+		t.Fatalf("受伤后剩余 %d 颗心, 期望 %d", got, MaxHearts-1)
+	}
+	if !h.Invulnerable() {
+		t.Fatal("受伤后应当进入无敌时间")
+	}
+
+	// 无敌时间内无论被判定多少次碰撞，都只算一次伤害。
+	for i := 0; i < InvulnTicks-1; i++ {
+		h.Update()
+		if h.Hurt() {
+			t.Fatalf("无敌时间内不应再次扣血（第 %d tick）", i+1)
+		}
+	}
+	if !h.Invulnerable() {
+		t.Fatal("倒计时未走完时仍应处于无敌状态")
+	}
+
+	h.Update()
+	if h.Invulnerable() {
+		t.Fatal("经过 InvulnTicks 个 tick 后无敌时间应当结束")
+	}
+	if !h.Hurt() {
+		t.Fatal("无敌时间结束后应当可以再次扣血")
+	}
+	if got := h.Hearts(); got != MaxHearts-2 {
+		t.Fatalf("第二次受伤后剩余 %d 颗心, 期望 %d", got, MaxHearts-2)
+	}
+}
+
+func TestHealthDiesWhenHeartsRunOut(t *testing.T) {
+	h := NewHealth(2)
+
+	for i := 0; i < 2; i++ {
+		if !h.Hurt() {
+			t.Fatalf("第 %d 次受伤应当生效", i+1)
+		}
+		for j := 0; j < InvulnTicks; j++ {
+			h.Update()
+		}
+	}
+
+	if !h.Dead() {
+		t.Fatal("两颗心都扣完后应当判定为死亡")
+	}
+	if got := h.Hearts(); got != 0 {
+		t.Fatalf("死亡时剩余 %d 颗心, 期望 0", got)
+	}
+	if h.Hurt() {
+		t.Fatal("死亡后不应再扣血")
+	}
+}
+
+// newTestPlayScene 创建一个没有管子干扰的游戏画面，只用来测试天花板/地板受伤逻辑。
+func newTestPlayScene(hearts int) *playScene {
+	s := &playScene{
+		player: NewPlayer(60, 75),
+		pipes:  NewPipeField(1),
+		health: NewHealth(hearts),
+	}
+	s.pipes.pipes = nil
+	s.pipes.timer = math.MaxInt
+	return s
+}
+
+// newTestGame 创建一个只带音效的游戏实例（音效播放器全是 nil，播放是空操作）。
+func newTestGame() *Game {
+	return &Game{sfx: &sound.Sound{}}
+}
+
+func TestPlaySceneCeilingHurtsAndClamps(t *testing.T) {
+	s := newTestPlayScene(3)
+	s.player.Y = 1
+	s.player.VelY = -5
+
+	if err := s.Update(newTestGame()); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := s.health.Hearts(); got != 2 {
+		t.Fatalf("撞到天花板后剩余 %d 颗心, 期望 2", got)
+	}
+	if s.player.Y != 0 {
+		t.Fatalf("角色应被贴回屏幕顶边, y = %v", s.player.Y)
+	}
+	if s.player.VelY != 0 {
+		t.Fatalf("撞到天花板后竖直速度应清零, VelY = %v", s.player.VelY)
+	}
+}
+
+func TestPlaySceneFloorDrainsHeartsThenGameOver(t *testing.T) {
+	s := newTestPlayScene(3)
+	g := newTestGame()
+
+	for i := 0; i < 600 && s.health.Hearts() == 3; i++ {
+		if err := s.Update(g); err != nil {
+			t.Fatal(err)
+		}
+		if s.player.Rect().Bottom() > ScreenHeight {
+			t.Fatalf("角色不应跑出屏幕底部, y = %v", s.player.Y)
+		}
+	}
+	if got := s.health.Hearts(); got != 2 {
+		t.Fatalf("掉到地板后剩余 %d 颗心, 期望 2", got)
+	}
+
+	// 一直不操作，角色会一直贴着地板，但无敌时间保证每 60 tick 才扣一次血。
+	for i := 0; i < 600; i++ {
+		if _, over := g.scene.(*gameOverScene); over {
+			break
+		}
+		if err := s.Update(g); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if !s.health.Dead() {
+		t.Fatal("血量应当已经耗尽")
+	}
+	if _, ok := g.scene.(*gameOverScene); !ok {
+		t.Fatalf("血量耗尽后应当切换到结束画面, 实际场景类型 %T", g.scene)
 	}
 }
 

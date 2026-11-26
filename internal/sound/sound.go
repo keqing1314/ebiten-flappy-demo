@@ -1,17 +1,28 @@
-// Package sound 用代码现场合成音效，不依赖任何音频文件。
+// Package sound 负责游戏的全部音效。
 //
-// Ebitengine 的 audio 包播放的是「原始 PCM 数据」：16 位有符号整数、双声道、左右声道交错、
-// 小端序。也就是说，只要把一串 []byte 交给它就能发声。
-// 这里利用这一点，用方波算出几个 8-bit 风格的效果音，顺便展示 audio 包的基本用法。
+// 拍翅膀、得分、失败三个短音效用代码现场合成：Ebitengine 的 audio 包播放的是
+// 「原始 PCM 数据」（16 位有符号整数、双声道、左右声道交错、小端序），
+// 只要把一串 []byte 交给它就能发声，于是这里用方波算出几个 8-bit 风格的效果音。
+//
+// 受伤音效则是随包内嵌的 mp3 文件（hurt.mp3），用 go:embed 打进二进制，
+// 运行时由 audio/mp3 解码成 PCM 流再交给播放器——这也是加载音频文件的标准做法。
 package sound
 
 import (
+	"bytes"
+	_ "embed"
 	"encoding/binary"
 	"fmt"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 )
+
+// hurtMP3 是受伤音效的原始字节。go:embed 只能嵌入当前目录及其子目录的文件。
+//
+//go:embed hurt.mp3
+var hurtMP3 []byte
 
 // SampleRate 是采样率：每秒采样多少个点。44100 是 CD 音质，足够用了。
 // 合成 PCM 时的采样率必须和 audio.Context 的采样率一致，否则声音会变调。
@@ -24,10 +35,11 @@ const SampleRate = 44100
 type Sound struct {
 	flap  *audio.Player // 拍翅膀
 	score *audio.Player // 得分
-	hit   *audio.Player // 撞击
+	hit   *audio.Player // 失败（血量耗尽）
+	hurt  *audio.Player // 受伤（掉血）
 }
 
-// Load 合成音效并创建播放器。
+// Load 合成音效、解码内嵌的 mp3，并创建全部播放器。
 func Load() *Sound {
 	ctx, err := newContext()
 	if err != nil {
@@ -36,12 +48,31 @@ func Load() *Sound {
 	}
 
 	// NewPlayerFromBytes 会把整段 PCM 数据包成一个可重复播放的播放器。
-	// 三个音效互不干扰，所以各自持有一个播放器。
+	// 每个音效互不干扰，所以各自持有一个播放器。
 	return &Sound{
 		flap:  ctx.NewPlayerFromBytes(render(sweep(520, 900), 0.08, 0.35)),
 		score: ctx.NewPlayerFromBytes(render(twoTone(880, 1320), 0.16, 0.35)),
 		hit:   ctx.NewPlayerFromBytes(render(sweep(300, 90), 0.30, 0.50)),
+		hurt:  newMP3Player(ctx, hurtMP3),
 	}
+}
+
+// newMP3Player 把内嵌的 mp3 解码成可重复播放的播放器。
+//
+// mp3 是压缩格式，解码时要把采样率转换成与音频上下文一致，所以必须等 newContext 成功。
+// 任何一步失败都返回 nil，调用方会静音处理，游戏照常运行。
+func newMP3Player(ctx *audio.Context, data []byte) *audio.Player {
+	stream, err := mp3.DecodeWithSampleRate(ctx.SampleRate(), bytes.NewReader(data))
+	if err != nil {
+		fmt.Printf("解码受伤音效失败，已跳过: %v\n", err)
+		return nil
+	}
+	p, err := ctx.NewPlayer(stream)
+	if err != nil {
+		fmt.Printf("创建受伤音效播放器失败，已跳过: %v\n", err)
+		return nil
+	}
+	return p
 }
 
 // Flap 播放「拍翅膀」音效。
@@ -50,7 +81,10 @@ func (s *Sound) Flap() { play(s.flap) }
 // Score 播放「得分」音效。
 func (s *Sound) Score() { play(s.score) }
 
-// Hit 播放「撞击」音效。
+// Hurt 播放「受伤」音效（掉一颗心时触发）。
+func (s *Sound) Hurt() { play(s.hurt) }
+
+// Hit 播放「失败」音效（血量耗尽时触发）。
 func (s *Sound) Hit() { play(s.hit) }
 
 // play 从头播放一个音效。

@@ -31,6 +31,7 @@ type Assets struct {
 	Sky    *ebiten.Image // 背景，640x360，正好铺满逻辑画布
 	Wall   *ebiten.Image // 土管，21x361
 	Gopher *ebiten.Image // 主角地鼠，60x75
+	Heart  *ebiten.Image // 血条图标，1024x1024，绘制时按 HUD 尺寸缩放
 
 	gopherSource image.Image            // 未上传 GPU 的原始图像，用作窗口图标
 	fontSource   *text.GoTextFaceSource // 字体源，可反复创建不同字号的样式
@@ -55,6 +56,9 @@ func Load() (*Assets, error) {
 	}
 	if a.Gopher, a.gopherSource, err = ebitenutil.NewImageFromFileSystem(dir, "gopher.png"); err != nil {
 		return nil, fmt.Errorf("加载 gopher.png 失败: %w", err)
+	}
+	if a.Heart, _, err = ebitenutil.NewImageFromFileSystem(dir, "heart.png"); err != nil {
+		return nil, fmt.Errorf("加载 heart.png 失败: %w", err)
 	}
 
 	// 使用 Ebitengine 官方示例自带的像素字体 PressStart2P。

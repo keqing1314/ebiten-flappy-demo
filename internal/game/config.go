@@ -56,3 +56,23 @@ const (
 	minGapCenter = PipeGapHeight/2 + PipeGapMargin
 	maxGapCenter = ScreenHeight - PipeGapHeight/2 - PipeGapMargin
 )
+
+// 血量与 HUD。
+const (
+	// MaxHearts 是初始血量（心数）。撞到管子、天花板、地板各扣 1 颗心，
+	// 全部扣光才算失败。
+	MaxHearts = 6
+
+	// InvulnTicks 是受伤后的无敌时间（单位：tick，60 tick = 1 秒）。
+	// 角色和管子重叠的状态往往要持续几十个 tick（管子从角色身上移过去需要时间），
+	// 没有无敌时间的话一次碰撞就会掉光所有心。
+	InvulnTicks = 60
+
+	// HeartSize 是 HUD 上血条图标的显示尺寸（像素），贴图本身是 1024x1024，绘制时缩放。
+	// HeartGap 是相邻两颗心的间距。
+	HeartSize = 22.0
+	HeartGap  = 6.0
+	// HeartMarginX、HeartMarginY 是血条距离画面左上角的边距。
+	HeartMarginX = 10.0
+	HeartMarginY = 10.0
+)
