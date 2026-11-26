@@ -38,6 +38,9 @@ type Game struct {
 
 	difficulty Difficulty // 当前难度，由标题画面选择，重开一局时沿用
 
+	display        DisplayMode // 当前显示模式：窗口或全屏
+	appliedDisplay DisplayMode // 已经应用到窗口上的显示模式
+
 	best  int  // 本次运行内的最高分
 	debug bool // 是否显示调试信息（F1 切换）
 }
@@ -71,9 +74,19 @@ func (g *Game) Update() error {
 	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
 		g.debug = !g.debug
 	}
+	// F / F11 随时切换窗口与全屏，标题画面也可以直接点击对应的按钮。
+	if g.input.ToggleDisplayJustPressed() {
+		g.toggleDisplay()
+	}
 
 	// 具体的游戏逻辑交给当前场景。
-	return g.scene.Update(g)
+	if err := g.scene.Update(g); err != nil {
+		return err
+	}
+
+	// 场景可能刚刚修改了显示设置，在本 tick 结束时统一应用到窗口。
+	g.applyDisplay()
+	return nil
 }
 
 // Draw 每一帧画面被调用一次。

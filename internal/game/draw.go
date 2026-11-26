@@ -69,6 +69,26 @@ func fillOverlay(dst *ebiten.Image, alpha uint8) {
 	vector.FillRect(dst, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{A: alpha}, false)
 }
 
+// optionButtonBorder 是标题画面选项按钮（难度、显示模式）共用的描边宽度。
+const optionButtonBorder = 2.0
+
+// drawOptionButton 绘制一个选项按钮：选中项用白底深色字（反色高亮），
+// 未选中项压暗，保证两者都清晰可读。
+func drawOptionButton(dst *ebiten.Image, r Rect, label string, face *text.GoTextFace, selected bool) {
+	var fill, border, textColor color.Color = color.RGBA{A: 0x50},
+		color.RGBA{R: 0x90, G: 0x90, B: 0x90, A: 0xff},
+		color.RGBA{R: 0xa0, G: 0xa0, B: 0xa0, A: 0xff}
+	if selected {
+		fill = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+		border = color.White
+		textColor = color.RGBA{R: 0x20, G: 0x40, B: 0x60, A: 0xff}
+	}
+
+	vector.FillRect(dst, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), fill, false)
+	vector.StrokeRect(dst, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), optionButtonBorder, border, false)
+	drawTextCenteredIn(dst, label, face, r, textColor)
+}
+
 // strokeRect 用一个像素的线框描出矩形，仅在调试模式下用来显示碰撞盒。
 func strokeRect(dst *ebiten.Image, r Rect, clr color.Color) {
 	vector.StrokeRect(dst, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), 1, clr, false)
