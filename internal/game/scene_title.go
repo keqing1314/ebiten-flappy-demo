@@ -28,19 +28,18 @@ type titleScene struct {
 }
 
 func newTitleScene() *titleScene {
-	return &titleScene{selected: DifficultyNormal}
+	return newTitleSceneWithDifficulty(DifficultyNormal)
+}
+
+// newTitleSceneWithDifficulty 创建标题画面，并预先选中某个难度。
+// 从暂停菜单返回主界面时用它保留上一次选择的难度。
+func newTitleSceneWithDifficulty(d Difficulty) *titleScene {
+	return &titleScene{selected: d}
 }
 
 // difficultyButtonRect 返回第 i 个难度按钮的矩形。
 func difficultyButtonRect(i int) Rect {
-	total := float64(numDifficulties)*difficultyButtonW + float64(numDifficulties-1)*difficultyButtonGap
-	x := (ScreenWidth - total) / 2
-	return Rect{
-		X: x + float64(i)*(difficultyButtonW+difficultyButtonGap),
-		Y: difficultyButtonY,
-		W: difficultyButtonW,
-		H: difficultyButtonH,
-	}
+	return centeredButtonRect(i, numDifficulties, difficultyButtonY, difficultyButtonW, difficultyButtonH, difficultyButtonGap)
 }
 
 // hitTestDifficulty 返回点 (x, y) 命中的难度按钮，没点中任何按钮时 ok 为 false。
@@ -55,14 +54,7 @@ func hitTestDifficulty(x, y float64) (Difficulty, bool) {
 
 // displayButtonRect 返回第 i 个显示模式按钮的矩形。
 func displayButtonRect(i int) Rect {
-	total := float64(numDisplayModes)*displayButtonW + float64(numDisplayModes-1)*displayButtonGap
-	x := (ScreenWidth - total) / 2
-	return Rect{
-		X: x + float64(i)*(displayButtonW+displayButtonGap),
-		Y: displayButtonY,
-		W: displayButtonW,
-		H: displayButtonH,
-	}
+	return centeredButtonRect(i, numDisplayModes, displayButtonY, displayButtonW, displayButtonH, displayButtonGap)
 }
 
 // hitTestDisplay 返回点 (x, y) 命中的显示模式按钮，没点中任何按钮时 ok 为 false。

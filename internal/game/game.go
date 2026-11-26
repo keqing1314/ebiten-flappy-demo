@@ -67,10 +67,11 @@ func New() (*Game, error) {
 func (g *Game) Update() error {
 	g.input.Update()
 
-	// Esc 随时退出；F1 切换调试信息（FPS/TPS、碰撞盒）。
+	// Esc 打开暂停菜单；在暂停菜单里再按一次 Esc 则继续游戏。
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-		return ebiten.Termination
+		g.togglePause()
 	}
+	// F1 切换调试信息（FPS/TPS、碰撞盒）。
 	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
 		g.debug = !g.debug
 	}

@@ -5,6 +5,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/hajimehoshi/ebiten/v2"
+
 	"github.com/keqing1314/ebiten-flappy-demo/internal/sound"
 )
 
@@ -729,6 +731,177 @@ func TestTitleDisplaySelection(t *testing.T) {
 	g.input.pressX, g.input.pressY = 0, 0
 	if _, ok := displayChoice(g.input); ok {
 		t.Fatal("按钮之外的点击不应返回显示模式")
+	}
+}
+
+func TestPauseMenuLayout(t *testing.T) {
+	if numPauseOptions < 2 {
+		t.Fatalf("暂停菜单至少需要两个选项, 实际 %d", numPauseOptions)
+	}
+
+	prevRight := 0.0
+	for i := 0; i < numPauseOptions; i++ {
+		r := pauseButtonRect(i)
+		if r.X < prevRight {
+			t.Fatalf("暂停菜单按钮 %d 与前一个按钮重叠", i)
+		}
+		if r.X < 0 || r.Right() > ScreenWidth || r.Y < 0 || r.Bottom() > ScreenHeight {
+			t.Fatalf("暂停菜单按钮 %d 超出画面: x=%v..%v y=%v..%v", i, r.X, r.Right(), r.Y, r.Bottom())
+		}
+		prevRight = r.Right()
+
+		if o, ok := hitTestPause(r.X+r.W/2, r.Y+r.H/2); !ok || o != pauseOption(i) {
+			t.Fatalf("暂停菜单按钮 %d 的中心没有命中自己", i)
+		}
+	}
+
+	if _, ok := hitTestPause(0, 0); ok {
+		t.Fatal("按钮之外的点击不应命中暂停菜单选项")
+	}
+}
+
+func TestTogglePause(t *testing.T) {
+	g := newTestGame()
+	title := newTitleScene()
+	g.scene = title
+
+	g.togglePause()
+	p, ok := g.scene.(*pauseScene)
+	if !ok {
+		t.Fatalf("按 Esc 应打开暂停菜单, 实际 %T", g.scene)
+	}
+	if p.prev != title {
+		t.Fatal("暂停菜单应保留原来的画面")
+	}
+
+	g.togglePause()
+	if g.scene != title {
+		t.Fatalf("再次按 Esc 应回到原来的画面, 实际 %T", g.scene)
+	}
+}
+
+func TestPauseMenuActions(t *testing.T) {
+	s := newPauseScene(newTitleScene())
+	g := newTestGame()
+	g.scene = s
+
+	if s.selected != pauseOptionMainMenu {
+		t.Fatalf("默认应高亮返回主界面, 实际 %v", s.selected)
+	}
+
+	// 左右切换选项。
+	g.input.menuDelta = 1
+	if err := s.Update(g); err != nil {
+		t.Fatal(err)
+	}
+	if s.selected != pauseOptionQuit {
+		t.Fatalf("向右应切到退出游戏, 实际 %v", s.selected)
+	}
+
+	// 点击返回主界面：回到标题画面，并保留当前难度。
+	g.difficulty = DifficultyHard
+	r := pauseButtonRect(int(pauseOptionMainMenu))
+	g.input.menuDelta = 0
+	g.input.hasPressPos = true
+	g.input.pressX, g.input.pressY = r.X+r.W/2, r.Y+r.H/2
+	if err := s.Update(g); err != nil {
+		t.Fatal(err)
+	}
+	title, ok := g.scene.(*titleScene)
+	if !ok {
+		t.Fatalf("选择返回主界面后应进入标题画面, 实际 %T", g.scene)
+	}
+	if title.selected != DifficultyHard {
+		t.Fatalf("返回主界面后应保留难度, 实际 %v", title.selected)
+	}
+
+	// 键盘确认退出游戏 → 退出整个程序。
+	g.scene = s
+	s.selected = pauseOptionMainMenu
+	g.input.hasPressPos = false
+	g.input.menuDelta = 1
+	g.input.jumpPressed = false
+	if err := s.Update(g); err != nil {
+		t.Fatal(err)
+	}
+	if s.selected != pauseOptionQuit {
+		t.Fatalf("向右应切到退出游戏, 实际 %v", s.selected)
+	}
+	g.input.menuDelta = 0
+	g.input.jumpPressed = true
+	if err := s.Update(g); err != ebiten.Termination {
+		t.Fatalf("确认退出游戏应返回 Termination, 实际 %v", err)
+	}
+}
+
+func TestGameOverMenuLayout(t *testing.T) {
+	if numGameOverOptions < 2 {
+		t.Fatalf("失败菜单至少需要两个选项, 实际 %d", numGameOverOptions)
+	}
+
+	prevRight := 0.0
+	for i := 0; i < numGameOverOptions; i++ {
+		r := gameOverButtonRect(i)
+		if r.X < prevRight {
+			t.Fatalf("失败菜单按钮 %d 与前一个按钮重叠", i)
+		}
+		if r.X < 0 || r.Right() > ScreenWidth || r.Y < 0 || r.Bottom() > ScreenHeight {
+			t.Fatalf("失败菜单按钮 %d 超出画面: x=%v..%v y=%v..%v", i, r.X, r.Right(), r.Y, r.Bottom())
+		}
+		prevRight = r.Right()
+
+		if o, ok := hitTestGameOver(r.X+r.W/2, r.Y+r.H/2); !ok || o != gameOverOption(i) {
+			t.Fatalf("失败菜单按钮 %d 的中心没有命中自己", i)
+		}
+	}
+
+	if _, ok := hitTestGameOver(0, 0); ok {
+		t.Fatal("按钮之外的点击不应命中失败菜单选项")
+	}
+}
+
+func TestGameOverMenuConfirm(t *testing.T) {
+	s := newGameOverScene(newTestPlayScene(1))
+	if s.selected != gameOverRestart {
+		t.Fatalf("默认应高亮重新开始, 实际 %v", s.selected)
+	}
+
+	// 键盘确认当前高亮的选项。
+	if o, ok := s.confirm(Input{jumpPressed: true}); !ok || o != gameOverRestart {
+		t.Fatalf("键盘应确认重新开始, 实际 %v (ok=%v)", o, ok)
+	}
+
+	// 点击 QUIT 按钮直接确认退出。
+	r := gameOverButtonRect(int(gameOverQuit))
+	in := Input{hasPressPos: true, pressX: r.X + r.W/2, pressY: r.Y + r.H/2}
+	if o, ok := s.confirm(in); !ok || o != gameOverQuit {
+		t.Fatalf("点击 QUIT 应确认退出, 实际 %v (ok=%v)", o, ok)
+	}
+
+	// 点空白处不确认任何选项。
+	if _, ok := s.confirm(Input{hasPressPos: true}); ok {
+		t.Fatal("按钮之外的点击不应确认任何选项")
+	}
+}
+
+func TestGameOverMenuQuit(t *testing.T) {
+	s := newGameOverScene(newTestPlayScene(1))
+	s.ticks = restartDelay
+	g := newTestGame()
+	g.scene = s
+
+	g.input.menuDelta = 1
+	if err := s.Update(g); err != nil {
+		t.Fatal(err)
+	}
+	if s.selected != gameOverQuit {
+		t.Fatalf("向右应切到退出, 实际 %v", s.selected)
+	}
+
+	g.input.menuDelta = 0
+	g.input.jumpPressed = true
+	if err := s.Update(g); err != ebiten.Termination {
+		t.Fatalf("确认退出应返回 Termination, 实际 %v", err)
 	}
 }
 

@@ -10,6 +10,19 @@ import (
 
 // 本文件是绘制用的小工具函数，被各个场景共用。
 
+// centeredButtonRect 返回一行水平居中的按钮中第 i 个按钮的矩形。
+// 难度、显示模式以及暂停/结束菜单都复用这套布局，保证按钮排列一致。
+func centeredButtonRect(i, count int, y, w, h, gap float64) Rect {
+	total := float64(count)*w + float64(count-1)*gap
+	x := (ScreenWidth - total) / 2
+	return Rect{
+		X: x + float64(i)*(w+gap),
+		Y: y,
+		W: w,
+		H: h,
+	}
+}
+
 // drawBackground 把背景图铺在画布左上角。
 // 背景图尺寸（640x360）与逻辑画布一致，所以直接 1:1 绘制即可。
 func drawBackground(dst, bg *ebiten.Image) {
@@ -69,7 +82,7 @@ func fillOverlay(dst *ebiten.Image, alpha uint8) {
 	vector.FillRect(dst, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{A: alpha}, false)
 }
 
-// optionButtonBorder 是标题画面选项按钮（难度、显示模式）共用的描边宽度。
+// optionButtonBorder 是菜单选项按钮（难度、显示模式、暂停/失败菜单）共用的描边宽度。
 const optionButtonBorder = 2.0
 
 // drawOptionButton 绘制一个选项按钮：选中项用白底深色字（反色高亮），
