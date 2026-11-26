@@ -46,10 +46,30 @@ func (p *Pipe) Draw(dst, wall *ebiten.Image) {
 	drawSprite(dst, wall, p.X, p.GapY+PipeGapHeight)
 }
 
+// ScrollSpeedAt 返回存活 ticks 个 tick 后的卷动速度（像素/tick）。
+//
+// 速度随存活时间按对数增长：前期提升最明显，之后逐渐放缓，最终停在 ScrollSpeedMax：
+//
+//	speed = min(ScrollSpeedMax, ScrollSpeed + ScrollSpeedGain*ln(1+ticks/ScrollSpeedRampTicks))
+//
+// 之所以用对数而不是线性，是因为线性增长迟早会让管子快到无法反应，
+// 而对数曲线天然有上限，既能让玩家感到难度在涨，又不会失控。
+func ScrollSpeedAt(ticks int) float64 {
+	if ticks <= 0 {
+		return ScrollSpeed
+	}
+	speed := ScrollSpeed + ScrollSpeedGain*math.Log1p(float64(ticks)/ScrollSpeedRampTicks)
+	if speed > ScrollSpeedMax {
+		return ScrollSpeedMax
+	}
+	return speed
+}
+
 // PipeField 负责管理屏幕上所有管子：生成、移动、计分、回收。
 type PipeField struct {
 	pipes      []*Pipe
 	timer      int // 距离下一次生成还有多少 tick
+	ticks      int // 已经存活了多少个 tick，用来计算随存活时间提升的卷动速度
 	rng        *rand.Rand
 	score      int
 	lastCenter float64 // 上一根管子空隙中心的高度，用来限制变化幅度
@@ -79,11 +99,14 @@ func (f *PipeField) Pipes() []*Pipe {
 	return f.pipes
 }
 
-// Update 推进一个 tick：移动 → 计分 → 回收 → 生成。
+// Update 推进一个 tick：移动（速度随存活时间提升）→ 计分 → 回收 → 生成。
 // playerX 是角色左边缘的 x 坐标，用来判断管子是否已经被甩到身后。
 func (f *PipeField) Update(playerX float64) {
+	f.ticks++
+	speed := ScrollSpeedAt(f.ticks)
+
 	for _, p := range f.pipes {
-		p.X -= ScrollSpeed
+		p.X -= speed
 
 		// 管子整体越过角色左边缘，说明玩家成功穿过，记 1 分（每根只记一次）。
 		if !p.scored && p.X+PipeWidth < playerX {

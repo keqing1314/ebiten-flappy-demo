@@ -259,6 +259,60 @@ func TestPlaySceneFloorDrainsHeartsThenGameOver(t *testing.T) {
 	}
 }
 
+func TestScrollSpeedRampsLogarithmically(t *testing.T) {
+	if got := ScrollSpeedAt(0); got != ScrollSpeed {
+		t.Fatalf("开局速度 %v, 期望 %v", got, ScrollSpeed)
+	}
+
+	prev := ScrollSpeedAt(0)
+	for ticks := 100; ticks <= 20000; ticks += 100 {
+		cur := ScrollSpeedAt(ticks)
+		if cur < prev {
+			t.Fatalf("速度不应随时间下降: %d tick 时 %v < %v", ticks, cur, prev)
+		}
+		if cur > ScrollSpeedMax {
+			t.Fatalf("%d tick 时速度 %v 超过上限 %v", ticks, cur, ScrollSpeedMax)
+		}
+		prev = cur
+	}
+
+	// 对数增长：同样长的存活区间，越靠后增量越小。
+	early := ScrollSpeedAt(1200) - ScrollSpeedAt(0)
+	late := ScrollSpeedAt(2400) - ScrollSpeedAt(1200)
+	if late >= early {
+		t.Fatalf("增速应逐渐放缓: 前 1200 tick 增加 %v, 后 1200 tick 增加 %v", early, late)
+	}
+
+	// 存活再久也不会超过上限。
+	if got := ScrollSpeedAt(1_000_000); got != ScrollSpeedMax {
+		t.Fatalf("超长时间存活后速度应为上限 %v, 实际 %v", ScrollSpeedMax, got)
+	}
+}
+
+func TestPipeFieldSpeedsUpOverTime(t *testing.T) {
+	f := NewPipeField(11)
+	f.timer = math.MaxInt
+
+	pipe := f.Pipes()[0]
+	f.Update(0)
+	early := ScreenWidth - pipe.X
+
+	// 让整片管子区域已经「存活」很久，再生成一根新管子观察它的速度。
+	f.pipes = nil
+	f.ticks = 20000
+	f.spawn()
+	latePipe := f.Pipes()[0]
+	f.Update(0)
+	late := ScreenWidth - latePipe.X
+
+	if late <= early {
+		t.Fatalf("长时间存活后管子应移动更快: 开局 %v 像素/tick, 后期 %v 像素/tick", early, late)
+	}
+	if late > ScrollSpeedMax {
+		t.Fatalf("后期速度 %v 超过上限 %v", late, ScrollSpeedMax)
+	}
+}
+
 func TestPipeFieldCollides(t *testing.T) {
 	f := NewPipeField(3)
 	f.timer = math.MaxInt

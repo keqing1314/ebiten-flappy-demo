@@ -105,6 +105,12 @@ ebiten-flappy-demo/
 `rect.go` 实现轴对齐矩形（AABB）相交判定，`pipe.go` 把每根管子拆成上下两个矩形。
 按 `F1` 可以看到实际参与判定的矩形。
 
+**难度曲线**
+`pipe.go` 的 `ScrollSpeedAt` 让卷动速度随存活时间按对数增长：
+`speed = min(ScrollSpeedMax, ScrollSpeed + ScrollSpeedGain*ln(1+ticks/ScrollSpeedRampTicks))`。
+前期提速明显、之后逐渐放缓，最终停在 `ScrollSpeedMax`（约 1.8 倍开局速度）。
+对数曲线天然有上限，既能感觉到难度在涨，又不会快到无法反应。
+
 **资源打包**
 `assets.go` 用 `//go:embed images/*.png` 把图片编译进二进制。
 
@@ -126,7 +132,10 @@ ebiten-flappy-demo/
 | `Gravity` | 重力加速度（像素/tick²） | 0.4 |
 | `JumpVelocity` | 每次拍翅膀的初速度 | -6.5 |
 | `MaxFallSpeed` | 下落速度上限 | 9.0 |
-| `ScrollSpeed` | 场景卷动速度 | 2.2 |
+| `ScrollSpeed` | 开局卷动速度（像素/tick） | 2.2 |
+| `ScrollSpeedMax` | 卷动速度上限（存活再久也不会超过） | 4.0 |
+| `ScrollSpeedRampTicks` | 提速的时间尺度（tick），越大前期提速越慢 | 1200 |
+| `ScrollSpeedGain` | 对数曲线的增速系数 | 0.8 |
 | `PipeInterval` | 每隔多少 tick 生成一根管子 | 100 |
 | `PipeGapHeight` | 空隙高度 | 150 |
 | `MaxGapDelta` | 相邻管子空隙中心的最大高度差 | 80 |
@@ -141,8 +150,9 @@ go test ./...
 ```
 
 覆盖的是不依赖窗口/GPU 的纯逻辑：矩形碰撞、跳跃与重力、管子生成节奏、计分与回收、
-相邻管子高度差限制，以及血量机制（无敌时间内不重复扣血、血量耗尽才判负、
-撞天花板/地板会扣血并把角色贴回屏幕内）。这类逻辑抽成纯函数后，测试跑得飞快，也不需要图形环境。
+相邻管子高度差限制，血量机制（无敌时间内不重复扣血、血量耗尽才判负、
+撞天花板/地板会扣血并把角色贴回屏幕内），以及随存活时间提升的卷动速度
+（对数增长、增速逐渐放缓、始终不超过上限）。这类逻辑抽成纯函数后，测试跑得飞快，也不需要图形环境。
 
 ## 可以继续练手的点
 

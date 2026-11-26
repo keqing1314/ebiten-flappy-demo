@@ -34,8 +34,17 @@ const (
 	// PlayerX 是角色固定的水平位置（左边缘）。角色只做上下运动，横向不移动。
 	PlayerX = 120.0
 
-	// ScrollSpeed 是场景每 tick 向左卷动的距离，单位：像素/tick。
+	// ScrollSpeed 是开局时的卷动速度，单位：像素/tick。
+	// 存活时间越长速度越快，曲线见 ScrollSpeedAt。
 	ScrollSpeed = 2.2
+	// ScrollSpeedMax 是卷动速度上限：再快玩家就来不及反应了，
+	// 所以对数曲线最终会停在这个值上（约为开局的 1.8 倍）。
+	ScrollSpeedMax = 4.0
+	// ScrollSpeedRampTicks 决定提速的快慢：存活到这么多 tick 时，
+	// 对数项 ln(1+ticks/ScrollSpeedRampTicks) 正好等于 ln 2。数值越大，前期提速越慢。
+	ScrollSpeedRampTicks = 1200.0
+	// ScrollSpeedGain 是对数曲线的系数，决定速度总共能抬升多少。
+	ScrollSpeedGain = 0.8
 	// PipeWidth 是管子的碰撞宽度，与 wall.png 的宽度（21px）一致。
 	PipeWidth = 21.0
 	// PipeInterval 是每隔多少个 tick 生成一根新管子。
