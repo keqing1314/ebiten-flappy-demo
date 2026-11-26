@@ -1,4 +1,4 @@
-# Flappy Gopher
+# Flappy Feibi
 
 一个用 **完整 Ebitengine v2**（`github.com/hajimehoshi/ebiten/v2`）重写的入门示例。
 
@@ -83,7 +83,8 @@ ebiten-flappy-demo/
 └── internal/
     ├── assets/
     │   ├── assets.go            go:embed 加载贴图与字体
-    │   └── images/              sky / wall / gopher / heart 与四个道具图标
+    │   ├── images/              sky / wall / feibi / heart 与四个道具图标（嵌入二进制）
+    │   └── source/              原始高清素材（不嵌入二进制）
     ├── game/
     │   ├── game.go              Game：实现 ebiten.Game（Update / Draw / Layout）
     │   ├── scene.go             Scene 接口（画面状态机）
@@ -170,6 +171,8 @@ speed = min(该难度上限, ScrollSpeed + ScrollSpeedGain*提速倍数*ln(1+tic
 
 **资源打包**
 `assets.go` 用 `//go:embed images/*.png` 把图片编译进二进制。
+主角贴图 `images/feibi.png` 是从 `source/feibi.png` 裁剪透明边距、缩放到 77x75 后的运行时版本；
+`source/` 子目录不参与 embed，避免把高清原图打进二进制。
 
 **音效**
 `sound.go` 直接用方波算出 PCM 数据（16 位、双声道、44100Hz），

@@ -115,12 +115,12 @@ func (s *titleScene) Update(g *Game) error {
 func (s *titleScene) Draw(g *Game, screen *ebiten.Image) {
 	drawBackground(screen, g.assets.Sky)
 
-	// 让地鼠轻轻地上下浮动，静止画面也显得有生气。
+	// 让菲比轻轻地上下浮动，静止画面也显得有生气。
 	bob := math.Sin(float64(s.ticks)/15) * 8
-	size := g.assets.Gopher.Bounds()
-	drawSprite(screen, g.assets.Gopher, (ScreenWidth-float64(size.Dx()))/2, 85+bob)
+	size := g.assets.Player.Bounds()
+	drawSprite(screen, g.assets.Player, (ScreenWidth-float64(size.Dx()))/2, 85+bob)
 
-	drawTextCentered(screen, "FLAPPY GOPHER", g.fontLarge, 26, color.White)
+	drawTextCentered(screen, "FLAPPY FEIBI", g.fontLarge, 26, color.White)
 
 	// 难度按钮：选中的高亮，未选中的压暗。
 	for i := 0; i < numDifficulties; i++ {

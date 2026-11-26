@@ -9,7 +9,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// playScene 是真正的游戏画面：地鼠、管子、道具、分数、血条都在这里。
+// playScene 是真正的游戏画面：菲比、管子、道具、分数、血条都在这里。
 type playScene struct {
 	player *Player
 	pipes  *PipeField
@@ -20,7 +20,7 @@ type playScene struct {
 
 // newPlayScene 开始新的一局。
 func newPlayScene(g *Game) *playScene {
-	size := g.assets.Gopher.Bounds()
+	size := g.assets.Player.Bounds()
 
 	// 用当前时间当随机种子，每一局管子的位置、掉落的道具都不一样。
 	seed := uint64(time.Now().UnixNano())
@@ -121,7 +121,7 @@ func (s *playScene) drawWorld(g *Game, screen *ebiten.Image) {
 			it.Draw(screen, itemImage(g.assets, it.Kind))
 		}
 	}
-	s.player.Draw(screen, g.assets.Gopher, s.playerAlpha())
+	s.player.Draw(screen, g.assets.Player, s.playerAlpha())
 }
 
 // playerAlpha 让角色在受伤后的无敌时间内闪烁，
