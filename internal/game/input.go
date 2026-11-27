@@ -14,8 +14,9 @@ import (
 //
 // 它们保证同一次按下只会在一个 tick 里返回 true，因此不需要我们再维护任何历史状态。
 type Input struct {
-	jumpPressed bool
-	menuDelta   int // 本 tick 的菜单左右切换量：-1 向左，+1 向右
+	jumpPressed   bool
+	menuDelta     int  // 本 tick 的菜单左右切换量：-1 向左，+1 向右
+	displayToggle bool // 本 tick 是否按下了切换窗口/全屏的键
 
 	// 本 tick 点击（鼠标或触摸）的位置，用于判断点中了哪个按钮。
 	pressX, pressY float64
@@ -45,6 +46,9 @@ func (in *Input) Update() {
 		in.menuDelta++
 	}
 
+	in.displayToggle = inpututil.IsKeyJustPressed(ebiten.KeyF) ||
+		inpututil.IsKeyJustPressed(ebiten.KeyF11)
+
 	// 记录本 tick 点击的位置：鼠标优先，其次是第一个刚按下的触摸点。
 	in.hasPressPos = false
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
@@ -66,6 +70,11 @@ func (in *Input) JumpJustPressed() bool {
 // MenuDelta 返回本 tick 菜单选择的变化：-1 向左，+1 向右，0 不变。
 func (in *Input) MenuDelta() int {
 	return in.menuDelta
+}
+
+// ToggleDisplayJustPressed 报告本 tick 是否按下了切换显示模式的键（F 或 F11）。
+func (in *Input) ToggleDisplayJustPressed() bool {
+	return in.displayToggle
 }
 
 // PressPosition 返回本 tick 点击的位置（逻辑坐标），鼠标和触摸都支持。

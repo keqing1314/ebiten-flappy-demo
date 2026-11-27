@@ -19,6 +19,7 @@ import (
 
 // imageFS 把 images 目录下的所有 png 打进程序里。
 // 注意：embed 只能包含当前目录及其子目录，所以资源文件必须放在本包内部。
+// 原始高清素材放在 source/ 子目录中，不会被这条通配规则嵌入二进制。
 //
 //go:embed images/*.png
 var imageFS embed.FS
@@ -30,7 +31,7 @@ var imageFS embed.FS
 type Assets struct {
 	Sky    *ebiten.Image // 背景，640x360，正好铺满逻辑画布
 	Wall   *ebiten.Image // 土管，21x361
-	Gopher *ebiten.Image // 主角地鼠，60x75
+	Player *ebiten.Image // 主角菲比，77x75（由 source/feibi.png 裁剪缩放而来）
 	Heart  *ebiten.Image // 血条图标，1024x1024，绘制时按 HUD 尺寸缩放
 
 	// 道具图标（都是 1024x1024，绘制时按 ItemSize 缩放）。
@@ -39,7 +40,7 @@ type Assets struct {
 	ItemShrink *ebiten.Image // 缩小角色
 	ItemSlow   *ebiten.Image // 降低卷动速度
 
-	gopherSource image.Image            // 未上传 GPU 的原始图像，用作窗口图标
+	playerSource image.Image            // 未上传 GPU 的原始图像，用作窗口图标
 	fontSource   *text.GoTextFaceSource // 字体源，可反复创建不同字号的样式
 }
 
@@ -60,8 +61,8 @@ func Load() (*Assets, error) {
 	if a.Wall, _, err = ebitenutil.NewImageFromFileSystem(dir, "wall.png"); err != nil {
 		return nil, fmt.Errorf("加载 wall.png 失败: %w", err)
 	}
-	if a.Gopher, a.gopherSource, err = ebitenutil.NewImageFromFileSystem(dir, "gopher.png"); err != nil {
-		return nil, fmt.Errorf("加载 gopher.png 失败: %w", err)
+	if a.Player, a.playerSource, err = ebitenutil.NewImageFromFileSystem(dir, "feibi.png"); err != nil {
+		return nil, fmt.Errorf("加载 feibi.png 失败: %w", err)
 	}
 	if a.Heart, _, err = ebitenutil.NewImageFromFileSystem(dir, "heart.png"); err != nil {
 		return nil, fmt.Errorf("加载 heart.png 失败: %w", err)
@@ -96,5 +97,5 @@ func (a *Assets) NewFace(size float64) *text.GoTextFace {
 
 // Icon 返回用于设置窗口图标的图像。
 func (a *Assets) Icon() image.Image {
-	return a.gopherSource
+	return a.playerSource
 }

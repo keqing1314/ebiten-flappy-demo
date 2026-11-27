@@ -10,6 +10,19 @@ import (
 
 // 本文件是绘制用的小工具函数，被各个场景共用。
 
+// centeredButtonRect 返回一行水平居中的按钮中第 i 个按钮的矩形。
+// 难度、显示模式以及暂停/结束菜单都复用这套布局，保证按钮排列一致。
+func centeredButtonRect(i, count int, y, w, h, gap float64) Rect {
+	total := float64(count)*w + float64(count-1)*gap
+	x := (ScreenWidth - total) / 2
+	return Rect{
+		X: x + float64(i)*(w+gap),
+		Y: y,
+		W: w,
+		H: h,
+	}
+}
+
 // drawBackground 把背景图铺在画布左上角。
 // 背景图尺寸（640x360）与逻辑画布一致，所以直接 1:1 绘制即可。
 func drawBackground(dst, bg *ebiten.Image) {
@@ -67,6 +80,26 @@ func drawTextCentered(dst *ebiten.Image, s string, face *text.GoTextFace, y floa
 // fillOverlay 在整个画面上盖一层半透明黑，用来「压暗」背景。
 func fillOverlay(dst *ebiten.Image, alpha uint8) {
 	vector.FillRect(dst, 0, 0, ScreenWidth, ScreenHeight, color.RGBA{A: alpha}, false)
+}
+
+// optionButtonBorder 是菜单选项按钮（难度、显示模式、暂停/失败菜单）共用的描边宽度。
+const optionButtonBorder = 2.0
+
+// drawOptionButton 绘制一个选项按钮：选中项用白底深色字（反色高亮），
+// 未选中项压暗，保证两者都清晰可读。
+func drawOptionButton(dst *ebiten.Image, r Rect, label string, face *text.GoTextFace, selected bool) {
+	var fill, border, textColor color.Color = color.RGBA{A: 0x50},
+		color.RGBA{R: 0x90, G: 0x90, B: 0x90, A: 0xff},
+		color.RGBA{R: 0xa0, G: 0xa0, B: 0xa0, A: 0xff}
+	if selected {
+		fill = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+		border = color.White
+		textColor = color.RGBA{R: 0x20, G: 0x40, B: 0x60, A: 0xff}
+	}
+
+	vector.FillRect(dst, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), fill, false)
+	vector.StrokeRect(dst, float32(r.X), float32(r.Y), float32(r.W), float32(r.H), optionButtonBorder, border, false)
+	drawTextCenteredIn(dst, label, face, r, textColor)
 }
 
 // strokeRect 用一个像素的线框描出矩形，仅在调试模式下用来显示碰撞盒。

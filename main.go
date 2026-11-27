@@ -1,4 +1,4 @@
-// Flappy Gopher 是一个用完整 Ebitengine (v2) API 编写的入门示例。
+// Flappy Feibi 是一个用完整 Ebitengine (v2) API 编写的入门示例。
 //
 // 与最初的 miniten 版本相比，这里不再使用任何「简化封装」：
 //   - 窗口与帧循环：自己实现 ebiten.Game 接口（Update / Draw / Layout）
@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// ---- 窗口设置，必须在 RunGame 之前调用 ----
-	ebiten.SetWindowTitle("Flappy Gopher - Ebitengine Demo")
+	ebiten.SetWindowTitle("Flappy Feibi - Ebitengine Demo")
 	ebiten.SetWindowIcon([]image.Image{g.Icon()})
 
 	// 逻辑分辨率固定 640x360，窗口默认放大 2 倍成 1280x720。

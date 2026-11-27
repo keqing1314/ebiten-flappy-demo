@@ -6,7 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Player 是玩家控制的地鼠。
+// Player 是玩家控制的菲比。
 //
 // 它用的是最经典的「速度 + 加速度」积分模型：
 //   - 拍翅膀：直接给 VelY 赋一个向上的初速度（相当于施加一次冲量）；
@@ -25,7 +25,7 @@ type Player struct {
 }
 
 // NewPlayer 在屏幕左侧、垂直居中的位置创建一个静止的角色。
-// 尺寸取自贴图本身（gopher.png 是 60x75），这样换素材时不需要改代码。
+// 尺寸取自贴图本身（feibi.png 是 77x75），这样换素材时不需要改代码。
 func NewPlayer(w, h float64) *Player {
 	return &Player{
 		X:     PlayerX,
