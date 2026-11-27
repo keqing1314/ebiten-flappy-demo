@@ -40,6 +40,9 @@ type Assets struct {
 
 	// PlayerFrames 是主角的飞行姿态动画帧（77x75），从挺身到微微俯冲依次排列。
 	PlayerFrames []*ebiten.Image
+	// PlayerJump 是起跳瞬间的专属姿态，比飞行帧更高（62x92）。
+	// 绘制时会按碰撞盒的底部中心对齐，双脚不会错位。
+	PlayerJump *ebiten.Image
 
 	// 道具图标（都是 1024x1024，绘制时按 ItemSize 缩放）。
 	ItemHeart  *ebiten.Image // 恢复一颗心
@@ -81,6 +84,9 @@ func Load() (*Assets, error) {
 			a.Player = img
 			a.playerSource = src
 		}
+	}
+	if a.PlayerJump, _, err = ebitenutil.NewImageFromFileSystem(dir, "feibi_jump.png"); err != nil {
+		return nil, fmt.Errorf("加载 feibi_jump.png 失败: %w", err)
 	}
 	if a.Heart, _, err = ebitenutil.NewImageFromFileSystem(dir, "heart.png"); err != nil {
 		return nil, fmt.Errorf("加载 heart.png 失败: %w", err)

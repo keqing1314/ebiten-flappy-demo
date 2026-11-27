@@ -124,9 +124,12 @@ func (s *playScene) drawWorld(g *Game, screen *ebiten.Image) {
 	s.player.Draw(screen, s.playerImage(g), s.playerAlpha())
 }
 
-// playerImage 返回当前飞行姿态对应的贴图。
-// 帧序列从挺身到俯冲，由竖直速度决定，所以动作始终和运动同步。
+// playerImage 返回当前姿态对应的贴图。
+// 刚起跳的短时间内显示专属跳跃姿态，之后切回按竖直速度选择的飞行帧。
 func (s *playScene) playerImage(g *Game) *ebiten.Image {
+	if s.player.JumpPose() {
+		return g.assets.PlayerJump
+	}
 	frames := g.assets.PlayerFrames
 	return frames[s.player.Frame(len(frames))]
 }

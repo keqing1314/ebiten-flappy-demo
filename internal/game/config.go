@@ -30,6 +30,9 @@ const (
 	// MaxFallSpeed 是下落速度上限。没有它的话，速度太快时一帧位移可能超过障碍物宽度，
 	// 出现「穿模」（直接从管子里穿过去）。
 	MaxFallSpeed = 9.0
+	// JumpPoseTicks 是起跳后显示专属跳跃姿态的时长（单位：tick）。
+	// 时间一到就切回按竖直速度选择的飞行帧。
+	JumpPoseTicks = 12
 
 	// PlayerX 是角色固定的水平位置（左边缘）。角色只做上下运动，横向不移动。
 	PlayerX = 120.0

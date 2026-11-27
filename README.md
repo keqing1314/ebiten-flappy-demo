@@ -83,7 +83,7 @@ ebiten-flappy-demo/
 └── internal/
     ├── assets/
     │   ├── assets.go            go:embed 加载贴图与字体
-    │   ├── images/              sky / wall / feibi_fly0~3 / heart 与四个道具图标（嵌入二进制）
+    │   ├── images/              sky / wall / feibi_fly0~3 / feibi_jump / heart 与四个道具图标（嵌入二进制）
     │   └── source/              原始高清素材（不嵌入二进制）
     ├── game/
     │   ├── game.go              Game：实现 ebiten.Game（Update / Draw / Layout）
@@ -145,6 +145,10 @@ ebiten-flappy-demo/
 4 张帧图由 `source/feibi_flyN.png` 统一缩放到 77x75，画布对齐，切换时角色不会跳位。
 新增帧只需把图片按顺序放进 `images/`，并把 `assets.PlayerFrameCount` 改成新数量。
 
+起跳时还会短暂显示专属的跳跃姿态 `images/feibi_jump.png`（`JumpPoseTicks` 个 tick，约 0.2 秒），
+之后再切回按速度选帧的飞行循环。跳跃贴图比飞行帧更高，绘制时以碰撞盒的底部中心对齐，
+所以姿态切换时双脚不会上下跳位；连续起跳会刷新计时，一直保持跳跃姿态。
+
 **难度曲线**
 标题画面可以选择难度，两种模式只有卷动速度曲线不同。`difficulty.go` 的 `SpeedAt` 让速度随存活时间按对数增长：
 
@@ -179,7 +183,9 @@ speed = min(该难度上限, ScrollSpeed + ScrollSpeedGain*提速倍数*ln(1+tic
 **资源打包**
 `assets.go` 用 `//go:embed images/*.png` 把图片编译进二进制。
 主角的 4 张姿态帧 `images/feibi_fly0.png` ~ `feibi_fly3.png` 是把 `source/feibi_flyN.png`
-统一缩放到 77x75 后的运行时版本；`source/` 子目录不参与 embed，避免把高清原图打进二进制。
+统一缩放到 77x75 后的运行时版本；跳跃姿态 `images/feibi_jump.png` 同样由 `source/feibi_jump.png`
+去掉白色背景和水印后缩放得到，并按角色大小对齐到碰撞盒底部中心。
+`source/` 子目录不参与 embed，避免把高清原图打进二进制。
 
 **音效**
 `sound.go` 直接用方波算出 PCM 数据（16 位、双声道、44100Hz），

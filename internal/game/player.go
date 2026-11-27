@@ -21,7 +21,8 @@ type Player struct {
 	Scale float64 // 缩放比例，1 是原始大小（缩小道具会把它调小）
 	VelY  float64 // 竖直速度，单位：像素/tick，向下为正
 
-	shrinkTicks int // 缩小效果还剩多少 tick，0 表示没有缩小
+	shrinkTicks   int // 缩小效果还剩多少 tick，0 表示没有缩小
+	jumpPoseTicks int // 跳跃姿态还剩多少 tick，0 表示已切回飞行帧
 }
 
 // NewPlayer 在屏幕左侧、垂直居中的位置创建一个静止的角色。
@@ -56,9 +57,16 @@ func (p *Player) SetScale(scale float64) {
 	p.Y = cy - p.H*p.Scale/2
 }
 
-// Jump 给角色一个向上的初速度。
+// Jump 给角色一个向上的初速度，并切换到跳跃姿态。
 func (p *Player) Jump() {
 	p.VelY = JumpVelocity
+	p.jumpPoseTicks = JumpPoseTicks
+}
+
+// JumpPose 报告角色是否处于起跳后的专属跳跃姿态。
+// 连续起跳会刷新持续时间，因此按住连跳时姿态会一直保持。
+func (p *Player) JumpPose() bool {
+	return p.jumpPoseTicks > 0
 }
 
 // Update 按固定步长推进一个 tick 的物理模拟。
@@ -75,6 +83,10 @@ func (p *Player) Update() {
 		if p.shrinkTicks == 0 {
 			p.SetScale(1)
 		}
+	}
+
+	if p.jumpPoseTicks > 0 {
+		p.jumpPoseTicks--
 	}
 }
 
@@ -99,10 +111,17 @@ func (p *Player) Rect() Rect {
 
 // Draw 把角色贴图按当前缩放画到当前位置。
 // alpha 是不透明度（0~1），受伤后的无敌时间用它来做闪烁提示。
+//
+// 贴图以碰撞盒的底部中心对齐：飞行帧和碰撞盒一样大，位置不变；
+// 跳跃姿态比碰撞盒更高，这样切换时双脚仍然落在同一条线上。
 func (p *Player) Draw(dst, img *ebiten.Image, alpha float64) {
+	b := img.Bounds()
+	drawW := float64(b.Dx()) * p.Scale
+	drawH := float64(b.Dy()) * p.Scale
+
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(p.Scale, p.Scale)
-	op.GeoM.Translate(p.X, p.Y)
+	op.GeoM.Translate(p.X+(p.W*p.Scale-drawW)/2, p.Y+p.H*p.Scale-drawH)
 	op.ColorScale.ScaleAlpha(float32(alpha))
 	dst.DrawImage(img, op)
 }

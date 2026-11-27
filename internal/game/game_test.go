@@ -385,6 +385,39 @@ func TestPlayerFrameFollowsVelocity(t *testing.T) {
 	}
 }
 
+func TestPlayerJumpPoseExpires(t *testing.T) {
+	p := NewPlayer(77, 75)
+	if p.JumpPose() {
+		t.Fatal("初始状态不应该显示跳跃姿态")
+	}
+
+	p.Jump()
+	if !p.JumpPose() {
+		t.Fatal("起跳后应该显示跳跃姿态")
+	}
+
+	// 姿态持续 JumpPoseTicks 个 tick，最后一个 tick 仍然可见。
+	for i := 0; i < JumpPoseTicks-1; i++ {
+		p.Update()
+	}
+	if !p.JumpPose() {
+		t.Fatal("跳跃姿态不应该提前结束")
+	}
+	p.Update()
+	if p.JumpPose() {
+		t.Fatal("跳跃姿态应该在 JumpPoseTicks 个 tick 后结束")
+	}
+
+	// 再次起跳会重新开始计时。
+	p.Jump()
+	for i := 0; i < JumpPoseTicks-1; i++ {
+		p.Update()
+	}
+	if !p.JumpPose() {
+		t.Fatal("再次起跳后跳跃姿态应该重新计时")
+	}
+}
+
 func TestPlayerShrinkExpires(t *testing.T) {
 	p := NewPlayer(60, 75)
 	p.Shrink(ItemShrinkTicks)
