@@ -25,7 +25,7 @@ type Player struct {
 }
 
 // NewPlayer 在屏幕左侧、垂直居中的位置创建一个静止的角色。
-// 尺寸取自贴图本身（feibi.png 是 77x75），这样换素材时不需要改代码。
+// 尺寸取自贴图本身（每帧都是 77x75），这样换素材时不需要改代码。
 func NewPlayer(w, h float64) *Player {
 	return &Player{
 		X:     PlayerX,
@@ -76,6 +76,20 @@ func (p *Player) Update() {
 			p.SetScale(1)
 		}
 	}
+}
+
+// Frame 返回当前飞行姿态对应的动画帧索引（共 frames 帧）。
+//
+// 帧序列从「挺身向上」逐渐过渡到「微微俯冲」：
+// 竖直速度越向上（刚拍完翅膀）越靠前，下落越快越靠后。
+// 用速度而不是时间驱动，动作和运动完全同步——起跳的瞬间就会换成上扬的姿态。
+func (p *Player) Frame(frames int) int {
+	if frames <= 1 {
+		return 0
+	}
+	t := (p.VelY - JumpVelocity) / (MaxFallSpeed - JumpVelocity)
+	t = math.Min(math.Max(t, 0), 1)
+	return int(t*float64(frames-1) + 0.5)
 }
 
 // Rect 返回当前的碰撞盒（体型会随 Scale 变化）。

@@ -24,6 +24,10 @@ import (
 //go:embed images/*.png
 var imageFS embed.FS
 
+// PlayerFrameCount 是主角飞行姿态的帧数，对应 images/feibi_fly0.png ~ feibi_fly3.png。
+// 帧序列从「挺身向上」过渡到「微微俯冲」，绘制时按角色的竖直速度选择。
+const PlayerFrameCount = 4
+
 // Assets 是加载完成的资源集合。
 //
 // 贴图在加载时就已经解码并上传到 GPU（*ebiten.Image），
@@ -31,8 +35,11 @@ var imageFS embed.FS
 type Assets struct {
 	Sky    *ebiten.Image // 背景，640x360，正好铺满逻辑画布
 	Wall   *ebiten.Image // 土管，21x361
-	Player *ebiten.Image // 主角菲比，77x75（由 source/feibi.png 裁剪缩放而来）
+	Player *ebiten.Image // 主角菲比的第一帧，77x75（标题画面用）
 	Heart  *ebiten.Image // 血条图标，1024x1024，绘制时按 HUD 尺寸缩放
+
+	// PlayerFrames 是主角的飞行姿态动画帧（77x75），从挺身到微微俯冲依次排列。
+	PlayerFrames []*ebiten.Image
 
 	// 道具图标（都是 1024x1024，绘制时按 ItemSize 缩放）。
 	ItemHeart  *ebiten.Image // 恢复一颗心
@@ -61,8 +68,19 @@ func Load() (*Assets, error) {
 	if a.Wall, _, err = ebitenutil.NewImageFromFileSystem(dir, "wall.png"); err != nil {
 		return nil, fmt.Errorf("加载 wall.png 失败: %w", err)
 	}
-	if a.Player, a.playerSource, err = ebitenutil.NewImageFromFileSystem(dir, "feibi.png"); err != nil {
-		return nil, fmt.Errorf("加载 feibi.png 失败: %w", err)
+	// 主角的动画帧：第 0 帧同时用作标题画面贴图和窗口图标。
+	a.PlayerFrames = make([]*ebiten.Image, PlayerFrameCount)
+	for i := 0; i < PlayerFrameCount; i++ {
+		name := fmt.Sprintf("feibi_fly%d.png", i)
+		img, src, err := ebitenutil.NewImageFromFileSystem(dir, name)
+		if err != nil {
+			return nil, fmt.Errorf("加载 %s 失败: %w", name, err)
+		}
+		a.PlayerFrames[i] = img
+		if i == 0 {
+			a.Player = img
+			a.playerSource = src
+		}
 	}
 	if a.Heart, _, err = ebitenutil.NewImageFromFileSystem(dir, "heart.png"); err != nil {
 		return nil, fmt.Errorf("加载 heart.png 失败: %w", err)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/keqing1314/ebiten-flappy-demo/internal/assets"
 	"github.com/keqing1314/ebiten-flappy-demo/internal/sound"
 )
 
@@ -341,6 +342,46 @@ func TestPlayerShrinkClamps(t *testing.T) {
 	p.SetScale(0.01)
 	if p.Scale != PlayerMinScale {
 		t.Fatalf("缩放比例应停在下限 %v, 实际 %v", PlayerMinScale, p.Scale)
+	}
+}
+
+func TestPlayerFrameFollowsVelocity(t *testing.T) {
+	const frames = assets.PlayerFrameCount
+	p := NewPlayer(77, 75)
+
+	// 刚拍翅膀：速度最快向上，显示最「挺身」的第一帧。
+	p.Jump()
+	if got := p.Frame(frames); got != 0 {
+		t.Fatalf("起跳时应显示第 0 帧, 实际 %d", got)
+	}
+
+	// 匀速悬停（VelY 为 0）时落在中间帧。
+	p = NewPlayer(77, 75)
+	if got, want := p.Frame(frames), 1; got != want {
+		t.Fatalf("悬停时应显示第 %d 帧, 实际 %d", want, got)
+	}
+
+	// 一直下落：速度到达上限，显示最靠后的俯冲帧。
+	for i := 0; i < 300; i++ {
+		p.Update()
+	}
+	if got := p.Frame(frames); got != frames-1 {
+		t.Fatalf("最大下落速度时应显示第 %d 帧, 实际 %d", frames-1, got)
+	}
+
+	// 帧索引在任何速度下都必须合法。
+	for i := 0; i < 100; i++ {
+		p.Update()
+		if got := p.Frame(frames); got < 0 || got >= frames {
+			t.Fatalf("帧索引 %d 越界", got)
+		}
+	}
+
+	// 帧数不足时退化为第 0 帧。
+	for _, n := range []int{0, 1} {
+		if got := p.Frame(n); got != 0 {
+			t.Fatalf("%d 帧动画应返回 0, 实际 %d", n, got)
+		}
 	}
 }
 

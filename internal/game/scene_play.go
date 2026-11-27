@@ -121,7 +121,14 @@ func (s *playScene) drawWorld(g *Game, screen *ebiten.Image) {
 			it.Draw(screen, itemImage(g.assets, it.Kind))
 		}
 	}
-	s.player.Draw(screen, g.assets.Player, s.playerAlpha())
+	s.player.Draw(screen, s.playerImage(g), s.playerAlpha())
+}
+
+// playerImage 返回当前飞行姿态对应的贴图。
+// 帧序列从挺身到俯冲，由竖直速度决定，所以动作始终和运动同步。
+func (s *playScene) playerImage(g *Game) *ebiten.Image {
+	frames := g.assets.PlayerFrames
+	return frames[s.player.Frame(len(frames))]
 }
 
 // playerAlpha 让角色在受伤后的无敌时间内闪烁，
